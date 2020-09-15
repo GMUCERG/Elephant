@@ -1,0 +1,89 @@
+Notation common for all variants:
+
+Na, Nm, Nc, Nh : the number of complete blocks of associated data, plaintext, ciphertext, and hash message, respectively
+Ina, Inm, Inc, Inh : binary variables equal to 1 if the last block of the respective data type is incomplete, and 0 otherwise
+Bla, Blm, Blc, and Blh : the number of bytes in the incomplete block of associated data, plaintext, ciphertext, and hash message, respectively
+
+
+NOTE: All variants use the same test vectors
+Primary difference in variants is that the rounds per cycle of spogent
+permutation are unrolled
+Valid values for rounds per cycle are 1, 4, 5, and 8.
+Set PERM_ROUNDS_PER_CYCLE in elephant_constants.vhd as desired.
+
+a. Design goal
+   V1 Full datapath 1 cycle 1 round supports AEAD Encrypt/Decrypt
+   Basic iterative full datapath width
+   1) < 2000 LUTs
+   2) No BRAMS
+   3) no DSP units
+b. Supported maximum size of inputs: Support for all message sizes
+c. Reference software implementation:
+   crypto_aead/elephant160v1/ref/
+        With bug fixes present on published Git repo
+               https://github.com/TimBeyne/Elephant
+d. Non-default values of generics and constants: None
+e.  Block sizes:
+    AD Block size = M Block size = CT Block size = 160 bits
+f.  Execution times
+    There is no difference between full blocks and incomplete blocks.
+    This is due to the shifting that occurs while processing the input.
+    Execution time of authenticated encryption:
+        87+((8+80)*(Na+4))+(8+160)*Nm)+2
+    Execution time of authenticated decryption:
+        87+((8+80)*(Na+4))+(8+160)*Nc)+2
+
+    Permutation time:
+        80
+H)
+    latency of authenticated encryption
+    259+256=515
+    latency of authenticated decryption
+    259+256=515
+I)
+    Execution time of authenticated encryption:
+        4+((8+80)*(Na+4))+(8+160)*Nm)+2
+    Execution time of authenticated decryption:
+        4+((8+80)*(Na+4))+(8+160)*Nc)+2
+    Key setup time: Loading a new key
+        7 + 80
+    Key reset time: Loading a saved key
+        4
+J) No Change
+
+A) V5 Full datapath 1 cycle 5 round perm supports AEAD Encrypt/Decrypt
+B) Unrolled permutation
+   Maximum throughput assuming 2000 or less LUTs
+   no BRAMs and no DSP units
+C) Support for all message sizes
+D)  crypto_aead/elephant160v1/ref/
+        With bug fixes present on published Git repo
+               https://github.com/TimBeyne/Elephant
+E) N/A
+F) AD Block size = M Block size = CT Block size = 160 bits
+G)  
+    There is no difference between full blocks and incomplete blocks.
+    This is due to the shifting that occurs while processing the input.
+    Execution time of authenticated encryption:
+        23+((8+16)*(Na+4))+((8+32)*Nm)+2
+    Execution time of authenticated decryption:
+        23+((8+16)*(Na+4))+((8+32)*Nc)+2
+
+    Key setup time: Loading a new key
+        7 + 16
+    Key reset time: Loading a saved key
+        4
+    Permutation time:
+        16
+H)
+    latency of authenticated encryption
+    28+40=68
+    latency of authenticated decryption
+    28+40=68
+I)  New key vs same key     Difference
+    23          4        =  19
+    Execution time of authenticated encryption:
+        4+((8+16)*(Na+4))+((8+32)*Nm)+2
+    Execution time of authenticated decryption:
+        4+((8+16)*(Na+4))+((8+32)*Nc)+2
+J) No Change
