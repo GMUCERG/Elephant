@@ -370,20 +370,27 @@ begin
                 else
                     n_ctl_s <= MDATA_S;
                 end if;
+            elsif calling_state = MDATA_NPUB and (bdi_type = "0000" or bdi_type = HDR_TAG)  then
+                -- Handles case where PT and CT are empty
+                n_ctl_s <= MDATA_S;
+                n_done_state <= '1';
+                n_append_one <= '1';
             else
                 n_ctl_s <= calling_state;
             end if;
         else
             if calling_state = AD_S then
-                if bdi_type = HDR_MSG or bdi_type = HDR_CT then
-                    -- There is actual data that needs to be processed for messages
-                    n_ctl_s <= MDATA_NPUB;
+                if append_one = '1' then
+                    n_ctl_s <= calling_state;
                 else
-                    n_ctl_s <= TAG_S;
-                    reset_data_cnt <= '1';
+                    n_ctl_s <= MDATA_NPUB;
                 end if;
             elsif calling_state = MDATA_S then
-                n_ctl_s <= TAG_S;
+                if append_one = '1' then
+                    n_ctl_s <= calling_state;
+                else
+                    n_ctl_s <= TAG_S;
+                end if;
             end if;
         end if;
         ms_en <= '1';
@@ -435,18 +442,13 @@ begin
                     end if;
                     if bdi_type = HDR_MSG then
                         bdo_type <= HDR_CT;
+                        saving_bdo <= '1';
                     else
                         bdo_type <= HDR_MSG;
                     end if;
-                    --Only need to save bdo if perform encrypt
-                    if decrypt_op = '0' then
-                        saving_bdo <= '1';
-                    end if;
                     --Need to signal to send the tag
                     if bdi_eot = '1' then
-                        if (data_cnt_int = BLOCK_SIZE-1 and bdi_valid_bytes = "1111") = False then
-                            n_done_state <= '1';
-                        end if;
+                        n_done_state <= '1';
                         if bdi_valid_bytes = "1111" then
                             n_append_one <= '1';
                         end if;

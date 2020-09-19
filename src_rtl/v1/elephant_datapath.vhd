@@ -78,7 +78,7 @@ architecture behavioral of elephant_datapath is
     signal load_data_output: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_xor_mux: std_logic_vector(STATE_SIZE-1 downto 0);
     
-    signal key_out: std_logic_vector(KEY_SIZE_BITS-1 downto 0);
+    signal key_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal npub_out: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
     signal tag_out: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     signal tag_input: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
@@ -124,13 +124,13 @@ begin
 
     key_reg: entity work.register_elephant
         generic map(
-            num_bits => KEY_SIZE_BITS
+            num_bits => STATE_SIZE
         )
         port map(
             clk => clk,
             en  => key_en,
             --Only need 4 cycles to load the key
-            din => ms_reg_input_mux(KEY_SIZE_BITS-1 downto 0),
+            din => ms_reg_input_mux(STATE_SIZE-1 downto 0),
             q   => key_out
         );
     npub_reg: entity work.register_elephant

@@ -23,7 +23,7 @@ entity elephant_datapath_lfsr is
     port(
         load_key: in std_logic;
         clk: in std_logic;
-        key_in: in std_logic_vector(KEY_SIZE_BITS-1 downto 0);
+        key_in: in std_logic_vector(STATE_SIZE-1 downto 0);
         en: in std_logic;
         ele_lfsr_output: out std_logic_vector(STATE_SIZE+16-1 downto 0)
     );
@@ -49,6 +49,6 @@ begin
     --BYTE temp = rotl3(input[0]) ^ (input[3] << 7) ^ (input[13] >> 7);
     lfsr_temp_rot <= (lfsr_output(4+16)  xor lfsr_output(24+16)) & lfsr_output(3+16 downto 0+16) & lfsr_output(7+16 downto 6+16) &
                      (lfsr_output(5+16) xor lfsr_output(111+16));
-    lfsr_input <= lfsr_temp_rot & lfsr_output(STATE_SIZE+16-1 downto 8) when load_key = '0' else x"00000000" & key_in & x"0000";
+    lfsr_input <= lfsr_temp_rot & lfsr_output(STATE_SIZE+16-1 downto 8) when load_key = '0' else  key_in & x"0000";
     ele_lfsr_output <= lfsr_output;
 end architecture behavioral;
