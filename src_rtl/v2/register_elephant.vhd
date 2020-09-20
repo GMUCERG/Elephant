@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
---! @file       elephant_constants.vhd
+--! @file       register_elephant.vhd
 --! @brief      
 --! @author     Richard Haeussler
 --! @copyright  Copyright (c) 2020 Cryptographic Engineering Research Group
@@ -16,25 +16,23 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use ieee.numeric_std.all;
-use ieee.math_real.all;
 
-package elephant_constants is
-    constant STATE_SIZE: integer := 160;
-    constant CCW_SIZE: integer := 32;
-    constant ADDR_BITs: integer := 3;
-    constant MASK_ADDR_BITs: integer := 2;
-    
-    constant KEY_SIZE: integer := 4; --16 Bytes
-    constant KEY_SIZE_BITS: integer := KEY_SIZE * CCW_SIZE;
-    constant ELE_NPUB_SIZE: integer := 3; --12 Bytes
-    constant NPUB_SIZE_BITS : integer := ELE_NPUB_SIZE * CCW_SIZE;
-    constant ELE_TAG_SIZE: integer := 2; -- 8 Bytes
-    constant TAG_SIZE_BITS: integer := ELE_TAG_SIZE * CCW_SIZE;
-    constant BLOCK_SIZE: integer := 5; --20 Bytes --Message full 5
-    
-    constant PERM_ROUNDS_PER_CYCLE: integer := 1;
-    constant PERM_CYCLES: integer := 80/PERM_ROUNDS_PER_CYCLE;
-    constant PERM_CYCLES_BITS: integer := 7;
-    --16 ~2500 LUTs
-    --8  ~1800 LUTs ROM
-end package elephant_constants;
+entity register_elephant is
+    generic (num_bits: integer := 8 );
+    port(
+        clk : std_logic;
+        en : std_logic;
+		din : in std_logic_vector(num_bits - 1 downto 0);
+        q: out std_logic_vector(num_bits - 1 downto 0)
+        );
+end register_elephant;
+
+architecture Behavioral of register_elephant is
+begin
+    process (clk, en)
+    begin
+        if rising_edge(clk) and en = '1' then
+            q <= din;
+        end if;
+    end process;
+end Behavioral;

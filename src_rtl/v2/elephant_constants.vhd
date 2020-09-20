@@ -32,7 +32,7 @@ package elephant_constants is
     constant TAG_SIZE_BITS: integer := ELE_TAG_SIZE * CCW_SIZE;
     constant BLOCK_SIZE: integer := 5; --20 Bytes --Message full 5
     
-    constant PERM_ROUNDS_PER_CYCLE: integer := 1;
+    constant PERM_ROUNDS_PER_CYCLE: integer := 5;
     constant PERM_CYCLES: integer := 80/PERM_ROUNDS_PER_CYCLE;
     constant PERM_CYCLES_BITS: integer := 7;
     --16 ~2500 LUTs
