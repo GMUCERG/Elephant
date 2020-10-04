@@ -28,8 +28,14 @@ use IEEE.STD_LOGIC_1164.all;
 package NIST_LWAPI_pkg is
 
     --! External bus: supported values are 8, 16 and 32 bits
-    constant W       : integer :=32;
-    constant SW      : integer :=W;
+    constant W       : integer := 32;
+    constant SW      : integer := W;
+    
+        
+    --! Asynchronous and active-low reset.
+    --! Can be set to `True` when targeting ASICs given that your CryptoCore supports it.
+    constant ASYNC_RSTN      : boolean := false;
+    
 
     --! Default values for do_data bus
     --! to avoid leaking intermeadiate values if do_valid = '0'.
@@ -38,7 +44,7 @@ package NIST_LWAPI_pkg is
     -- DO NOT CHANGE ANYTHING BELOW!
     constant Wdiv8   : integer := W/8;
     constant SWdiv8  : integer := SW/8;
-
+    
     --! INSTRUCTIONS (OPCODES)
     constant INST_HASH      : std_logic_vector(4    -1 downto 0):="1000";
     constant INST_ENC       : std_logic_vector(4    -1 downto 0):="0010";
@@ -78,11 +84,6 @@ package NIST_LWAPI_pkg is
     --! Other
     --! Limit to the segment counter size
     constant CTR_SIZE_LIM   : integer := 16;
-
-    --! =======================================================================
-    --! Deprecated parameters from CAESAR-LWAPI! DO NOT CHANGE!
-    --! asynchronous reset is not supported
-    constant ASYNC_RSTN   : boolean := FALSE;
 
     --! =======================================================================
     --! Functions used by LWC Core, PreProcessor and PostProcessor
