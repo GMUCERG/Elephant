@@ -111,60 +111,40 @@ begin
             en          => datap_lfsr_en,
             ele_lfsr_output => datap_lfsr_out
         );
-    ms_reg: entity work.register_elephant
-        generic map(
-            num_bits => STATE_SIZE
-        )
-        port map(
-            clk => clk,
-            en  => ms_en,
-            din => ms_reg_input_mux,
-            q   => ms_reg_out
-        );  
+    p_ms_reg: process(clk, ms_en)
+    begin
+        if rising_edge(clk) and  ms_en = '1' then
+            ms_reg_out <= ms_reg_input_mux;
+        end if;
+    end process;
+    p_key_reg: process(clk, key_en)
+    begin
+        if rising_edge(clk) and key_en = '1' then
+            key_out <= ms_reg_input_mux(STATE_SIZE-1 downto 0);
+        end if;
+    end process;
 
-    key_reg: entity work.register_elephant
-        generic map(
-            num_bits => STATE_SIZE
-        )
-        port map(
-            clk => clk,
-            en  => key_en,
-            --Only need 4 cycles to load the key
-            din => ms_reg_input_mux(STATE_SIZE-1 downto 0),
-            q   => key_out
-        );
-    npub_reg: entity work.register_elephant
-        generic map(
-            num_bits => NPUB_SIZE_BITS
-        )
-        port map(
-            clk => clk,
-            en  => npub_en,
-            --Only need 4 cycles to load the key
-            din => load_data_output(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS),
-            q   => npub_out
-        );
-    tag_reg: entity work.register_elephant
-        generic map(
-            num_bits => TAG_SIZE_BITS
-        )
-        port map(
-            clk => clk,
-            en  => tag_en,
-            --Only need 4 cycles to load the key
-            din => tag_input,
-            q   => tag_out
-        );
-    load_data: entity work.register_elephant
-        generic map(
-            num_bits => STATE_SIZE
-        )
-        port map(
-            clk => clk,
-            en  => load_data_en,
-            din => load_data_input_mux,
-            q   => load_data_output
-        );         
+    p_npub_reg: process(clk, npub_en)
+    begin
+        if rising_edge(clk) and npub_en = '1' then
+            npub_out <= load_data_output(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS);
+        end if;
+    end process;
+
+    p_tag_reg: process(clk, tag_en)
+    begin
+        if rising_edge(clk) and tag_en = '1' then
+            tag_out <= tag_input;
+        end if;
+    end process;
+
+    p_load_data: process(clk, load_data_en)
+    begin
+        if rising_edge(clk) and load_data_en = '1' then
+            load_data_output <= load_data_input_mux;
+        end if;
+    end process;
+
     --Select between process key or bdi
     bdi_or_key <= bdi when data_type_sel = '0' else  key;
     bdi_or_key_rev <= reverse_byte(bdi_or_key);
