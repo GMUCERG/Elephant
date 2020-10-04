@@ -74,7 +74,7 @@ architecture behavioral of elephant_datapath is
     signal bdi_or_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
     signal padding_bdi: std_logic_vector(CCW_SIZE-1 downto 0);
 --    signal bdi_or_reset: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal load_data_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal load_data_input_mux: std_logic_vector(CCW_SIZE-1 downto 0);
     signal load_data_output: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_xor_mux: std_logic_vector(STATE_SIZE-1 downto 0);
     
@@ -141,7 +141,11 @@ begin
     p_load_data: process(clk, load_data_en)
     begin
         if rising_edge(clk) and load_data_en = '1' then
-            load_data_output <= load_data_input_mux;
+            if load_data_sel = "11" then
+                load_data_output <= x"0000000000000000" & npub_out;
+            else
+                load_data_output <= load_data_input_mux & load_data_output(STATE_SIZE-1 downto CCW_SIZE);
+            end if;
         end if;
     end process;
 
@@ -160,11 +164,10 @@ begin
     --Also mux is very large at the momment might be able to reduce to CCW size
     --mux to reset load_data and shift data input
     with load_data_sel select
-        load_data_input_mux <= x"00000000" & load_data_output(STATE_SIZE-1 downto CCW_SIZE) when "00",
-                               bdi_or_bdo & load_data_output(STATE_SIZE-1 downto CCW_SIZE) when "01",
-                               padding_bdi & load_data_output(STATE_SIZE-1 downto CCW_SIZE) when "10",
-                               --Insert 01 padding logic here
-                               x"0000000000000000" & npub_out when others;
+        load_data_input_mux <= x"00000000"  when "00",
+                               bdi_or_bdo   when "01",
+                               padding_bdi  when others;
+
     --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
     --Would likely required this to happen after mux and => ms_reg would be zero prior
     --to the loading the state.
