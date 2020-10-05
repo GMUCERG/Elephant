@@ -88,8 +88,7 @@ architecture behavioral of CryptoCore is
     signal data_cnt_int :integer;--(BLOCK_SIZE-1 downto 0);
     
 --    signal reset_perm_cnt: std_logic;
-    signal perm_cnt_out: std_logic_vector(PERM_CYCLES_BITS-1 downto 0);
-    signal perm_cnt_int :integer;
+    signal perm_cnt_int, n_perm_cnt_int: unsigned(PERM_CYCLES_BITS-1 downto 0);
     
     type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
                        PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S, MDATA_NPUB, TAG_S);
@@ -127,7 +126,7 @@ begin
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
             data_count => data_cnt_out,
-            perm_count => perm_cnt_out(4 downto 0),
+            perm_count => perm_cnt_int(4 downto 0),
             clk        => clk
         );
     CTR_1: entity work.counter
@@ -141,17 +140,6 @@ begin
             q      => data_cnt_out
         );
     data_cnt_int <= to_integer(unsigned(data_cnt_out));
-    CTR_2: entity work.counter
-        generic map(
-            num_bits => PERM_CYCLES_BITS
-        )
-        port map(
-            clk    => clk,
-            reset  => load_lfsr,
-            enable => perm_en,
-            q      => perm_cnt_out
-        );
-    perm_cnt_int <= to_integer(unsigned(perm_cnt_out));
 
     
 state_control: process(all)
@@ -195,6 +183,7 @@ begin
     n_append_one <= append_one;
     n_decrypt_op <= decrypt_op;
     n_tag_verified <= tag_verified;
+    n_perm_cnt_int <= to_unsigned(0, n_perm_cnt_int'length);
 
     case ctl_s is
     when IDLE =>
@@ -202,8 +191,6 @@ begin
         n_tag_verified <= '1';
         tag_reset <= '1';
         tag_en <= '1';
-        load_data_en <= '1';
-        load_data_sel <= "11";  --clear reg
         reset_data_cnt <= '1';
         n_done_state <= '0';
         if bdi_valid = '1' or key_valid = '1' then
@@ -236,11 +223,11 @@ begin
             load_data_en <= '1'; -- clear input data reg
             load_data_sel <= "11";
             load_lfsr <= '1';
-            perm_en <= '0'; 
         end if;
     when PERM_KEY =>
         if perm_cnt_int < PERM_CYCLES then
             perm_en <= '1';
+            n_perm_cnt_int <= perm_cnt_int + 1;
             ms_en <= '1';
             if perm_cnt_int = PERM_CYCLES-1 then
                 --Save the perm key
@@ -330,7 +317,6 @@ begin
         --This will handle the logic of XOR with different mask prior to perm
         n_ctl_s <= PERM;
         ms_en <= '1';
-        perm_en <= '0';
         load_lfsr <= '1'; --Resets counter and lfsr
         reset_data_cnt <= '1';
         if calling_state = AD_S then
@@ -344,15 +330,14 @@ begin
     when PERM =>
         if perm_cnt_int < PERM_CYCLES then
             perm_en <= '1';
+            n_perm_cnt_int <= perm_cnt_int + 1;
             ms_en <= '1';
             if perm_cnt_int = PERM_CYCLES-1 then
                 n_ctl_s <= POST_PERM;
             end if;
         end if;
         --Loading data
-        if calling_state = AD_S and done_state /= '1' then
-            null;
-        elsif calling_state = AD_S and done_state = '1' then
+        if calling_state = AD_S and done_state = '1' then
             --Okay need to load npub
             load_data_en <= '1';
             load_data_sel <= "11";
@@ -394,7 +379,6 @@ begin
             end if;
         end if;
         ms_en <= '1';
-        perm_en <= '0';
         load_lfsr <= '1'; --Resets counter and lfsr
         if calling_state = AD_S or calling_state = MDATA_S then
             datap_lfsr_en <= '1';
@@ -510,6 +494,7 @@ end process;
 p_reg: process(clk)
 begin
     if rising_edge(clk) then
+        perm_cnt_int <= n_perm_cnt_int;
         if rst = '1' then
             ctl_s <= IDLE;
             calling_state <= IDLE;

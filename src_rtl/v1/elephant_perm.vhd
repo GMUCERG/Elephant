@@ -23,7 +23,7 @@ entity elephant_perm is
     port(
         input: in std_logic_vector(STATE_SIZE-1 downto 0);
         clk: in std_logic;
-        perm_count: in std_logic_vector(4 downto 0);
+        perm_count: in unsigned(4 downto 0);
         load_lfsr: in std_logic;
         output: out std_logic_vector(STATE_SIZE-1 downto 0)
     );
@@ -118,13 +118,13 @@ begin
     end generate;
     perm_round_not_1: if PERM_ROUNDS_PER_CYCLE - 1 /= 0 generate
         lsfr_sig_8: if PERM_ROUNDS_PER_CYCLE = 8 generate
-            lfsr_rom_sig <= lfsr_rom8(to_integer(unsigned(perm_count)));
+            lfsr_rom_sig <= lfsr_rom8(to_integer(perm_count));
         end generate;
         lsfr_sig_5: if PERM_ROUNDS_PER_CYCLE = 5 generate
-            lfsr_rom_sig <= lfsr_rom5(to_integer(unsigned(perm_count)));
+            lfsr_rom_sig <= lfsr_rom5(to_integer(perm_count));
         end generate;
         lsfr_sig_4: if PERM_ROUNDS_PER_CYCLE = 4 generate
-            lfsr_rom_sig <= lfsr_rom4(to_integer(unsigned(perm_count)));
+            lfsr_rom_sig <= lfsr_rom4(to_integer(perm_count));
         end generate;
     end generate;
 

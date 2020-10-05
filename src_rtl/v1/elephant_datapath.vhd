@@ -50,7 +50,7 @@ entity elephant_datapath is
         bdo_sel: in std_logic;
         saving_bdo: in std_logic;
         data_count: in std_logic_vector(2 downto 0);
-        perm_count: in std_logic_vector(4 downto 0);
+        perm_count: in unsigned(4 downto 0);
         clk: in std_logic
     );
 end elephant_datapath;
