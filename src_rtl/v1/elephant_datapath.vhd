@@ -191,11 +191,12 @@ begin
     perm_input <= ms_reg_out;
 
     with data_count select
-        ms_out_mux1 <= ms_reg_out(CCW-1 downto 0) when 0,
+        ms_out_mux2 <= ms_reg_out(CCW-1 downto 0) when 0,
                        ms_reg_out((2*CCW)-1 downto CCW) when 1,
                        ms_reg_out((3*CCW)-1 downto 2*CCW) when 2,
-                       ms_reg_out((4*CCW)-1 downto 3*CCW) when others;
-    ms_out_mux2 <= ms_out_mux1 when data_count /= 4 else ms_reg_out(STATE_SIZE-1 downto 4*CCW);
+                       ms_reg_out((4*CCW)-1 downto 3*CCW) when 3,
+                       ms_reg_out((5*CCW)-1 downto 4*CCW) when others;
+    --ms_out_mux2 <= ms_out_mux1 when data_count /= 4 else ms_reg_out(STATE_SIZE-1 downto 4*CCW);
     data_bdo <= bdi_or_key_rev xor ms_out_mux2;
     bdo <= reverse_byte(data_out_mux);
     tag_mux <= tag_out(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out(31 downto 0);
