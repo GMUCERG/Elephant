@@ -49,7 +49,7 @@ entity elephant_datapath is
         bdo: out std_logic_vector(CCW_SIZE-1 downto 0);
         bdo_sel: in std_logic;
         saving_bdo: in std_logic;
-        data_count: in std_logic_vector(2 downto 0);
+        data_count: in integer range 0 to BLOCK_SIZE+1; --std_logic_vector(2 downto 0);
         perm_count: in integer range 0 to PERM_CYCLES;
         clk: in std_logic
     );
@@ -190,15 +190,15 @@ begin
     ms_reg_input_mux <= permout when perm_en = '1' else lfsr_xor_mux;
     perm_input <= ms_reg_out;
 
-    with data_count(1 downto 0) select
-        ms_out_mux1 <= ms_reg_out(CCW-1 downto 0) when "00",
-                       ms_reg_out((2*CCW)-1 downto CCW) when "01",
-                       ms_reg_out((3*CCW)-1 downto 2*CCW) when "10",
+    with data_count select
+        ms_out_mux1 <= ms_reg_out(CCW-1 downto 0) when 0,
+                       ms_reg_out((2*CCW)-1 downto CCW) when 1,
+                       ms_reg_out((3*CCW)-1 downto 2*CCW) when 2,
                        ms_reg_out((4*CCW)-1 downto 3*CCW) when others;
-    ms_out_mux2 <= ms_out_mux1 when data_count(2) = '0' else ms_reg_out(STATE_SIZE-1 downto 4*CCW);
+    ms_out_mux2 <= ms_out_mux1 when data_count /= 4 else ms_reg_out(STATE_SIZE-1 downto 4*CCW);
     data_bdo <= bdi_or_key_rev xor ms_out_mux2;
     bdo <= reverse_byte(data_out_mux);
-    tag_mux <= tag_out(TAG_SIZE_BITS-1 downto 32) when data_count(0) = '1' else tag_out(31 downto 0);
+    tag_mux <= tag_out(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out(31 downto 0);
     data_out_mux <= data_bdo when bdo_sel ='0' else tag_mux;
     
 end behavioral;
