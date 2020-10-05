@@ -88,7 +88,7 @@ architecture behavioral of CryptoCore is
     signal data_cnt_int :integer;--(BLOCK_SIZE-1 downto 0);
     
 --    signal reset_perm_cnt: std_logic;
-    signal perm_cnt_int, n_perm_cnt_int: unsigned(PERM_CYCLES_BITS-1 downto 0);
+    signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
     
     type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
                        PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S, MDATA_NPUB, TAG_S);
@@ -126,7 +126,7 @@ begin
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
             data_count => data_cnt_out,
-            perm_count => perm_cnt_int(4 downto 0),
+            perm_count => perm_cnt_int,
             clk        => clk
         );
     CTR_1: entity work.counter
@@ -183,7 +183,7 @@ begin
     n_append_one <= append_one;
     n_decrypt_op <= decrypt_op;
     n_tag_verified <= tag_verified;
-    n_perm_cnt_int <= to_unsigned(0, n_perm_cnt_int'length);
+    n_perm_cnt_int <= 0;
 
     case ctl_s is
     when IDLE =>
