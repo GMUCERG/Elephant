@@ -34,16 +34,6 @@ architecture behavioral of elephant_datapath_lfsr is
     signal lfsr_output: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_temp_rot: std_logic_vector(7 downto 0);
 begin
-    lfsr_datapath: entity work.register_elephant
-        generic map(
-            num_bits => STATE_SIZE+16
-        )
-        port map(
-            clk => clk,
-            en  => en,
-            din => lfsr_input,
-            q   => lfsr_output
-        );
     --LFSR output
     --C code
     --BYTE temp = rotl3(input[0]) ^ (input[3] << 7) ^ (input[13] >> 7);
@@ -51,4 +41,12 @@ begin
                      (lfsr_output(5+16) xor lfsr_output(111+16));
     lfsr_input <= lfsr_temp_rot & lfsr_output(STATE_SIZE+16-1 downto 8) when load_key = '0' else  key_in & x"0000";
     ele_lfsr_output <= lfsr_output;
+
+    p_lfsr_data: process(clk, en)
+    begin
+        if rising_edge(clk) and en = '1' then
+            lfsr_output <= lfsr_input;
+        end if;
+    end process;
+
 end architecture behavioral;

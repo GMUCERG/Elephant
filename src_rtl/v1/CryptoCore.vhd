@@ -83,13 +83,10 @@ architecture behavioral of CryptoCore is
     signal datap_lfsr_en: std_logic;
     
     --Signals for data counter
-    signal reset_data_cnt, en_data_cnt: std_logic;
-    signal data_cnt_out: std_logic_vector(2 downto 0);
-    signal data_cnt_int :integer;--(BLOCK_SIZE-1 downto 0);
+    signal n_data_cnt_int, data_cnt_int :integer range 0 to BLOCK_SIZE+1;
     
 --    signal reset_perm_cnt: std_logic;
-    signal perm_cnt_out: std_logic_vector(PERM_CYCLES_BITS-1 downto 0);
-    signal perm_cnt_int :integer;
+    signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
     
     type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
                        PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S, MDATA_NPUB, TAG_S);
@@ -126,32 +123,10 @@ begin
             bdo => bdo_s,
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
-            data_count => data_cnt_out,
-            perm_count => perm_cnt_out(4 downto 0),
+            data_count => data_cnt_int,
+            perm_count => perm_cnt_int,
             clk        => clk
         );
-    CTR_1: entity work.counter
-        generic map(
-            num_bits => 3
-        )
-        port map(
-            clk    => clk,
-            reset  => reset_data_cnt,
-            enable => en_data_cnt,
-            q      => data_cnt_out
-        );
-    data_cnt_int <= to_integer(unsigned(data_cnt_out));
-    CTR_2: entity work.counter
-        generic map(
-            num_bits => PERM_CYCLES_BITS
-        )
-        port map(
-            clk    => clk,
-            reset  => load_lfsr,
-            enable => perm_en,
-            q      => perm_cnt_out
-        );
-    perm_cnt_int <= to_integer(unsigned(perm_cnt_out));
 
     
 state_control: process(all)
@@ -186,8 +161,6 @@ begin
     datap_lfsr_en <= '0';
     
     -- Signal for data counter
-    en_data_cnt <= '0';
-    reset_data_cnt <= '0';
     n_ctl_s <= ctl_s;
     n_calling_state <= calling_state;
     n_lfsr_loaded <= lfsr_loaded;
@@ -195,6 +168,9 @@ begin
     n_append_one <= append_one;
     n_decrypt_op <= decrypt_op;
     n_tag_verified <= tag_verified;
+    n_perm_cnt_int <= 0;
+    n_data_cnt_int <= data_cnt_int;
+    
 
     case ctl_s is
     when IDLE =>
@@ -202,9 +178,7 @@ begin
         n_tag_verified <= '1';
         tag_reset <= '1';
         tag_en <= '1';
-        load_data_en <= '1';
-        load_data_sel <= "11";  --clear reg
-        reset_data_cnt <= '1';
+        n_data_cnt_int <= 0;
         n_done_state <= '0';
         if bdi_valid = '1' or key_valid = '1' then
             if key_update = '1' then
@@ -215,14 +189,13 @@ begin
         end if;
     when STORE_KEY =>
         if data_cnt_int <= BLOCK_SIZE then
+            n_data_cnt_int <= data_cnt_int + 1;
             if key_valid = '1' then
                 key_ready <= '1';
-                en_data_cnt <= '1';
                 load_data_en <= '1';
                 data_type_sel <= '1'; --select key type
                 load_data_sel <= "01";
             else
-                en_data_cnt <= '1';
                 if data_cnt_int <= KEY_SIZE then
                     load_data_sel <= "00"; --zero pad
                     load_data_en <= '1';
@@ -232,15 +205,15 @@ begin
             end if;
         else
             n_ctl_s <= PERM_KEY;
-            reset_data_cnt <= '1';
+            n_data_cnt_int <= 0;
             load_data_en <= '1'; -- clear input data reg
             load_data_sel <= "11";
             load_lfsr <= '1';
-            perm_en <= '0'; 
         end if;
     when PERM_KEY =>
         if perm_cnt_int < PERM_CYCLES then
             perm_en <= '1';
+            n_perm_cnt_int <= perm_cnt_int + 1;
             ms_en <= '1';
             if perm_cnt_int = PERM_CYCLES-1 then
                 --Save the perm key
@@ -253,7 +226,7 @@ begin
             if bdi_valid = '1' then
                 n_decrypt_op <= decrypt_in;
                 bdi_ready <= '1';
-                en_data_cnt <= '1';
+                n_data_cnt_int <= data_cnt_int + 1;
                 load_data_en <= '1';
                 load_data_sel <= "01";
             end if;
@@ -265,9 +238,9 @@ begin
         --Obtain NPUB
         if data_cnt_int < ELE_NPUB_SIZE then
             if bdi_valid = '1' then
+                n_data_cnt_int <= data_cnt_int + 1;
                 n_decrypt_op <= decrypt_in;
                 bdi_ready <= '1';
-                en_data_cnt <= '1';
                 load_data_en <= '1';
                 load_data_sel <= "01";
             end if;
@@ -284,7 +257,7 @@ begin
             if bdi_valid = '1' then
                 if data_cnt_int < BLOCK_SIZE then
                     bdi_ready <= '1';
-                    en_data_cnt <= '1';
+                    n_data_cnt_int <= data_cnt_int + 1;
                     load_data_en <= '1';
                     if bdi_valid_bytes = "1111" then
                         load_data_sel <= "01";
@@ -303,7 +276,7 @@ begin
                 end if;
             end if;
         else
-            en_data_cnt <= '1';
+            n_data_cnt_int <= data_cnt_int + 1;
             load_data_en <= '1';
             if (append_one = '1' or done_state = '0') and data_cnt_int /= BLOCK_SIZE then
                 load_data_sel <= "10";
@@ -330,9 +303,8 @@ begin
         --This will handle the logic of XOR with different mask prior to perm
         n_ctl_s <= PERM;
         ms_en <= '1';
-        perm_en <= '0';
         load_lfsr <= '1'; --Resets counter and lfsr
-        reset_data_cnt <= '1';
+        n_data_cnt_int <= 0;
         if calling_state = AD_S then
             lfsr_mux_sel <= "10";
         elsif calling_state = MDATA_NPUB then
@@ -344,15 +316,14 @@ begin
     when PERM =>
         if perm_cnt_int < PERM_CYCLES then
             perm_en <= '1';
+            n_perm_cnt_int <= perm_cnt_int + 1;
             ms_en <= '1';
             if perm_cnt_int = PERM_CYCLES-1 then
                 n_ctl_s <= POST_PERM;
             end if;
         end if;
         --Loading data
-        if calling_state = AD_S and done_state /= '1' then
-            null;
-        elsif calling_state = AD_S and done_state = '1' then
+        if calling_state = AD_S and done_state = '1' then
             --Okay need to load npub
             load_data_en <= '1';
             load_data_sel <= "11";
@@ -394,7 +365,6 @@ begin
             end if;
         end if;
         ms_en <= '1';
-        perm_en <= '0';
         load_lfsr <= '1'; --Resets counter and lfsr
         if calling_state = AD_S or calling_state = MDATA_S then
             datap_lfsr_en <= '1';
@@ -413,7 +383,7 @@ begin
         n_calling_state <= MDATA_NPUB;
         ms_en <= '1';
         if done_state = '1' then
-            en_data_cnt <= '1';
+            n_data_cnt_int <= data_cnt_int + 1;
             datap_lfsr_en <= '1';
             if data_cnt_int = 0 then
                 datap_lfsr_load <= '1';
@@ -433,7 +403,7 @@ begin
                     bdi_ready <= '1';
                     bdo_valid_bytes <= bdi_valid_bytes;
                     bdo_valid <= '1';
-                    en_data_cnt <= '1';
+                    n_data_cnt_int <= data_cnt_int + 1;
                     load_data_en <= '1';
                     if bdi_valid_bytes = "1111" then
                         load_data_sel <= "01";
@@ -456,7 +426,7 @@ begin
                 end if;
             end if;
         else
-            en_data_cnt <= '1';
+            n_data_cnt_int <= data_cnt_int + 1;
             if append_one = '1' and data_cnt_int /= BLOCK_SIZE then
                 load_data_sel <= "10";
                 bdi_size_intern <= "00";
@@ -479,7 +449,7 @@ begin
             bdo_valid_bytes <= (others => '1');
             bdo_type <= HDR_TAG;
             if bdo_ready = '1' then
-                en_data_cnt <= '1';
+                n_data_cnt_int <= data_cnt_int + 1;
             end if;
             if data_cnt_int = ELE_TAG_SIZE-1 then
                 end_of_block <= '1';
@@ -488,7 +458,7 @@ begin
         else
             if bdi_valid = '1' and msg_auth_ready = '1' then
                 bdi_ready <= '1';
-                en_data_cnt <= '1';
+                n_data_cnt_int <= data_cnt_int + 1;
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
@@ -510,6 +480,8 @@ end process;
 p_reg: process(clk)
 begin
     if rising_edge(clk) then
+        perm_cnt_int <= n_perm_cnt_int;
+        data_cnt_int <= n_data_cnt_int;
         if rst = '1' then
             ctl_s <= IDLE;
             calling_state <= IDLE;
