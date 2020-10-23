@@ -23,8 +23,12 @@ use work.Design_pkg.all;
 entity elephant_datapath is
     port(
         --Signals to con
-        key: in std_logic_vector(CCW_SIZE-1 downto 0);
-        bdi: in std_logic_vector(CCW_SIZE-1 downto 0);
+        key_a: in std_logic_vector(CCW_SIZE-1 downto 0);
+        key_b: in std_logic_vector(CCW_SIZE-1 downto 0);
+        key_c: in std_logic_vector(CCW_SIZE-1 downto 0);
+        bdi_a: in std_logic_vector(CCW_SIZE-1 downto 0);
+        bdi_b: in std_logic_vector(CCW_SIZE-1 downto 0);
+        bdi_c: in std_logic_vector(CCW_SIZE-1 downto 0);
         bdi_size: in std_logic_vector(1 downto 0);
         data_type_sel: std_logic;
 
@@ -46,10 +50,12 @@ entity elephant_datapath is
         datap_lfsr_load: in std_logic;
         datap_lfsr_en: in std_logic;
         
-        bdo: out std_logic_vector(CCW_SIZE-1 downto 0);
+        bdo_a: out std_logic_vector(CCW_SIZE-1 downto 0);
+        bdo_b: out std_logic_vector(CCW_SIZE-1 downto 0);
+        bdo_c: out std_logic_vector(CCW_SIZE-1 downto 0);
         bdo_sel: in std_logic;
         saving_bdo: in std_logic;
-        data_count: in integer range 0 to BLOCK_SIZE+1; --std_logic_vector(2 downto 0);
+        data_count: in integer range 0 to BLOCK_SIZE + 1;
         perm_count: in integer range 0 to PERM_CYCLES;
         clk: in std_logic
     );
@@ -57,84 +63,160 @@ end elephant_datapath;
 
 architecture behavioral of elephant_datapath is
     
-    signal permout: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal perm_input: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal permout_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal permout_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal permout_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal perm_input_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal perm_input_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal perm_input_c: std_logic_vector(STATE_SIZE-1 downto 0);
     
-    signal datap_lfsr_out: std_logic_vector(STATE_SIZE+16-1 downto 0);
-    signal lfsr_current: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal lfsr_next: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal lfsr_prev: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal cur_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal prev_next_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal cur_next_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal datap_lfsr_out_a: std_logic_vector(STATE_SIZE+16-1 downto 0);
+    signal datap_lfsr_out_b: std_logic_vector(STATE_SIZE+16-1 downto 0);
+    signal datap_lfsr_out_c: std_logic_vector(STATE_SIZE+16-1 downto 0);
+    signal lfsr_current_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_current_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_current_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_next_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_next_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_next_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_prev_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_prev_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_prev_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_ms_xor_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_ms_xor_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_ms_xor_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal prev_next_ms_xor_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal prev_next_ms_xor_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal prev_next_ms_xor_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_next_ms_xor_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_next_ms_xor_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_next_ms_xor_c: std_logic_vector(STATE_SIZE-1 downto 0);
 
     
-    signal bdi_or_key: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal bdi_or_key_rev : std_logic_vector(CCW_SIZE-1 downto 0);
-    signal bdi_or_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal padding_bdi: std_logic_vector(CCW_SIZE-1 downto 0);
---    signal bdi_or_reset: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal load_data_input_mux: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal load_data_output: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal lfsr_xor_mux: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal bdi_or_key_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_key_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_key_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_key_rev_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_key_rev_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_key_rev_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_bdo_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_bdo_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal bdi_or_bdo_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal padding_bdi_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal padding_bdi_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal padding_bdi_c: std_logic_vector(CCW_SIZE-1 downto 0);
+
+    signal load_data_input_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal load_data_input_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal load_data_input_mux_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal load_data_output_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal load_data_output_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal load_data_output_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_xor_mux_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_xor_mux_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_xor_mux_c: std_logic_vector(STATE_SIZE-1 downto 0);
     
-    signal key_out: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal npub_out: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
-    signal tag_out: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
-    signal tag_input: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal key_out_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal key_out_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal key_out_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal npub_out_a: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
+    signal npub_out_b: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
+    signal npub_out_c: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
+    signal tag_out_a: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_out_b: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_out_c: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_input_a: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_input_b: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_input_c: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     
-    -- Verifiy this size
-    signal ms_reg_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal ms_reg_out: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal ms_out_mux1: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal ms_out_mux2: std_logic_vector(CCW_SIZE-1 downto 0);
     
-    signal data_out_mux: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal data_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal tag_mux: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_reg_input_mux_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_input_mux_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_input_mux_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_out_a: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_out_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_out_c: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_out_mux1_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_out_mux1_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_out_mux1_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_out_mux2_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_out_mux2_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_out_mux2_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    
+    signal data_out_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_out_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_out_mux_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_bdo_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_bdo_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_bdo_c: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal tag_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal tag_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal tag_mux_c: std_logic_vector(CCW_SIZE-1 downto 0);
     
 begin
 
     PERM: entity work.elephant_perm
         port map(
-            input => perm_input,
+            input_a => perm_input_a,
+            input_b => perm_input_a,
+            input_c => perm_input_c,
             clk => clk,
-            perm_count => perm_count,
-            load_lfsr => load_lfsr,
-            output => permout
+            perm_count_a => perm_count_a,
+            perm_count_b => perm_count_b,
+            perm_count_c => perm_count_c,
+            load_lfsr_a => load_lfsr_a,
+            load_lfsr_b => load_lfsr_b,
+            load_lfsr_c => load_lfsr_c,
+            output_a => permout_a,
+            output_b => permout_b,
+            output_c => permout_c
         );
     DATAP_LFSR: entity work.elephant_datapath_lfsr
         port map(
-            load_key    => datap_lfsr_load,
+            load_key_a    => datap_lfsr_load_a,
+            load_key_b    => datap_lfsr_load_b,
+            load_key_c    => datap_lfsr_load_c,
             clk         => clk,
-            key_in      => key_out,
+            key_in_a      => key_out_a,
+            key_in_b      => key_out_b,
+            key_in_c      => key_out_c,
             en          => datap_lfsr_en,
-            ele_lfsr_output => datap_lfsr_out
+            ele_lfsr_output_a => datap_lfsr_out_a
+            ele_lfsr_output_b => datap_lfsr_out_b
+            ele_lfsr_output_c => datap_lfsr_out_c
         );
     p_ms_reg: process(clk, ms_en)
     begin
         if rising_edge(clk) and  ms_en = '1' then
-            ms_reg_out <= ms_reg_input_mux;
+            ms_reg_out_a <= ms_reg_input_mux_a;
+            ms_reg_out_b <= ms_reg_input_mux_b;
+            ms_reg_out_c <= ms_reg_input_mux_c;
         end if;
     end process;
     p_key_reg: process(clk, key_en)
     begin
         if rising_edge(clk) and key_en = '1' then
-            key_out <= ms_reg_input_mux(STATE_SIZE-1 downto 0);
+            key_out_a <= ms_reg_input_mux_a(STATE_SIZE-1 downto 0);
+            key_out_b <= ms_reg_input_mux_b(STATE_SIZE-1 downto 0);
+            key_out_c <= ms_reg_input_mux_c(STATE_SIZE-1 downto 0);
         end if;
     end process;
 
     p_npub_reg: process(clk, npub_en)
     begin
         if rising_edge(clk) and npub_en = '1' then
-            npub_out <= load_data_output(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS);
+            npub_out_a <= load_data_output_a(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS);
+            npub_out_b <= load_data_output_b(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS);
+            npub_out_c <= load_data_output_c(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS);
         end if;
     end process;
 
     p_tag_reg: process(clk, tag_en)
     begin
         if rising_edge(clk) and tag_en = '1' then
-            tag_out <= tag_input;
+            tag_out_a <= tag_input_a;
+            tag_out_b <= tag_input_a;
+            tag_out_c <= tag_input_c;
         end if;
     end process;
 
@@ -142,65 +224,149 @@ begin
     begin
         if rising_edge(clk) and load_data_en = '1' then
             if load_data_sel = "11" then
-                load_data_output <= x"0000000000000000" & npub_out;
+                load_data_output_a <= x"0000000000000000" & npub_out_a;
+                load_data_output_b <= x"0000000000000000" & npub_out_b;
+                load_data_output_c <= x"0000000000000000" & npub_out_c;
             else
-                load_data_output <= load_data_input_mux & load_data_output(STATE_SIZE-1 downto CCW_SIZE);
+                load_data_output_a <= load_data_input_mux_a & load_data_output_a(STATE_SIZE-1 downto CCW_SIZE);
+                load_data_output_b <= load_data_input_mux_b & load_data_output_b(STATE_SIZE-1 downto CCW_SIZE);
+                load_data_output_c <= load_data_input_mux_c & load_data_output_c(STATE_SIZE-1 downto CCW_SIZE);
             end if;
         end if;
     end process;
 
     --Select between process key or bdi
-    bdi_or_key <= bdi when data_type_sel = '0' else  key;
-    bdi_or_key_rev <= reverse_byte(bdi_or_key);
-    bdi_or_bdo <= bdi_or_key_rev when saving_bdo = '0' else data_bdo;
+    bdi_or_key_a <= bdi_a when data_type_sel = '0' else  key_a;
+    bdi_or_key_b <= bdi_b when data_type_sel = '0' else  key_b;
+    bdi_or_key_c <= bdi_c when data_type_sel = '0' else  key_c;
+    bdi_or_key_rev_a <= reverse_byte(bdi_or_key_a);
+    bdi_or_key_rev_b <= reverse_byte(bdi_or_key_b);
+    bdi_or_key_rev_c <= reverse_byte(bdi_or_key_c);
+    bdi_or_bdo_a <= bdi_or_key_rev_a when saving_bdo = '0' else data_bdo_a;
+    bdi_or_bdo_b <= bdi_or_key_rev_b when saving_bdo = '0' else data_bdo_b;
+    bdi_or_bdo_c <= bdi_or_key_rev_c when saving_bdo = '0' else data_bdo_c;
     
     
    --Logic for how padding works
     with bdi_size select
-        padding_bdi <= x"00000001" when "00",
-                       x"000001" & bdi_or_bdo(7 downto 0) when "01",
-                       x"0001" & bdi_or_bdo(15 downto 0) when "10",
-                       x"01" & bdi_or_bdo(23 downto 0) when others;
-    --Also mux is very large at the momment might be able to reduce to CCW size
-    --mux to reset load_data and shift data input
+        padding_bdi_a <= x"00000001" when "00",
+                       x"000001" & bdi_or_bdo_a(7 downto 0) when "01",
+                       x"0001" & bdi_or_bdo_a(15 downto 0) when "10",
+                       x"01" & bdi_or_bdo_a(23 downto 0) when others;
+    with bdi_size select
+        padding_bdi_b <= x"00000001" when "00",
+                       x"000001" & bdi_or_bdo_b(7 downto 0) when "01",
+                       x"0001" & bdi_or_bdo_b(15 downto 0) when "10",
+                       x"01" & bdi_or_bdo_b(23 downto 0) when others;
+    with bdi_size select
+        padding_bdi_c <= x"00000001" when "00",
+                       x"000001" & bdi_or_bdo_c(7 downto 0) when "01",
+                       x"0001" & bdi_or_bdo_c(15 downto 0) when "10",
+                       x"01" & bdi_or_bdo_c(23 downto 0) when others;
+
+    --Controls the next input into the load_data register
     with load_data_sel select
-        load_data_input_mux <= x"00000000"  when "00",
-                               bdi_or_bdo   when "01",
-                               padding_bdi  when others;
+        load_data_input_mux_a <= x"00000000"  when "00",
+                               bdi_or_bdo_a   when "01",
+                               padding_bdi_a  when others;
+    with load_data_sel select
+        load_data_input_mux_b <= x"00000000"  when "00",
+                               bdi_or_bdo_b   when "01",
+                               padding_bdi_c  when others;
+    with load_data_sel select
+        load_data_input_mux_c <= x"00000000"  when "00",
+                               bdi_or_bdo_c   when "01",
+                               padding_bdi_c  when others;
 
     --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
     --Would likely required this to happen after mux and => ms_reg would be zero prior
     --to the loading the state.
-    lfsr_current <= datap_lfsr_out(STATE_SIZE+8-1 downto 8);
-    lfsr_next <= datap_lfsr_out(STATE_SIZE+16-1 downto 16);
-    lfsr_prev <= datap_lfsr_out(STATE_SIZE-1 downto 0);
-    cur_ms_xor <= lfsr_current xor ms_reg_out;
-    prev_next_ms_xor <= lfsr_prev xor lfsr_next xor ms_reg_out;
-    cur_next_ms_xor <= lfsr_next xor cur_ms_xor;
+    lfsr_current_a <= datap_lfsr_out_a(STATE_SIZE+8-1 downto 8);
+    lfsr_current_b <= datap_lfsr_out_b(STATE_SIZE+8-1 downto 8);
+    lfsr_current_c <= datap_lfsr_out_c(STATE_SIZE+8-1 downto 8);
+
+    lfsr_next_a <= datap_lfsr_out_a(STATE_SIZE+16-1 downto 16);
+    lfsr_next_b <= datap_lfsr_out_b(STATE_SIZE+16-1 downto 16);
+    lfsr_next_c <= datap_lfsr_out_c(STATE_SIZE+16-1 downto 16);
+
+    lfsr_prev_a <= datap_lfsr_out_a(STATE_SIZE-1 downto 0);
+    lfsr_prev_b <= datap_lfsr_out_b(STATE_SIZE-1 downto 0);
+    lfsr_prev_c <= datap_lfsr_out_c(STATE_SIZE-1 downto 0);
+
+    cur_ms_xor_a <= lfsr_current_a xor ms_reg_out_a;
+    cur_ms_xor_b <= lfsr_current_b xor ms_reg_out_b;
+    cur_ms_xor_c <= lfsr_current_c xor ms_reg_out_c;
+
+    prev_next_ms_xor_a <= lfsr_prev_a xor lfsr_next_a xor ms_reg_out_a;
+    prev_next_ms_xor_b <= lfsr_prev_b xor lfsr_next_b xor ms_reg_out_b;
+    prev_next_ms_xor_c <= lfsr_prev_c xor lfsr_next_c xor ms_reg_out_c;
+
+    cur_next_ms_xor_a <= lfsr_next_a xor cur_ms_xor_a;
+    cur_next_ms_xor_b <= lfsr_next_b xor cur_ms_xor_b;
+    cur_next_ms_xor_c <= lfsr_next_c xor cur_ms_xor_c;
+
     with lfsr_mux_sel select
-        lfsr_xor_mux <= load_data_output when "00",
-                        cur_ms_xor when "01",     
-                        prev_next_ms_xor when "10",
-                        cur_next_ms_xor when others;
+        lfsr_xor_mux_a <= load_data_output_a when "00",
+                        cur_ms_xor_a when "01",     
+                        prev_next_ms_xor_a when "10",
+                        cur_next_ms_xor_a when others;
+    with lfsr_mux_sel select
+        lfsr_xor_mux_b <= load_data_output_b when "00",
+                        cur_ms_xor_b when "01",     
+                        prev_next_ms_xor_b when "10",
+                        cur_next_ms_xor_b when others;
+    with lfsr_mux_sel select
+        lfsr_xor_mux_c <= load_data_output_c when "00",
+                        cur_ms_xor_c when "01",     
+                        prev_next_ms_xor_c when "10",
+                        cur_next_ms_xor_c when others;
     --Update Tag
 --    tag_input <= reverse_byte(lfsr_xor_mux(TAG_SIZE_BITS-1 downto 0)) xor tag_out when tag_reset = '0' else (others => '0');
-    tag_input <= lfsr_xor_mux(TAG_SIZE_BITS-1 downto 0) xor tag_out when tag_reset = '0' else (others => '0');
+    tag_input_a <= lfsr_xor_mux_a(TAG_SIZE_BITS-1 downto 0) xor tag_out_a when tag_reset = '0' else (others => '0');
+    tag_input_b <= lfsr_xor_mux_b(TAG_SIZE_BITS-1 downto 0) xor tag_out_b when tag_reset = '0' else (others => '0');
+    tag_input_c <= lfsr_xor_mux_c(TAG_SIZE_BITS-1 downto 0) xor tag_out_c when tag_reset = '0' else (others => '0');
 
     --Logic for ms_reg_mux and perm
-    ms_reg_input_mux <= permout when perm_en = '1' else lfsr_xor_mux;
-    perm_input <= ms_reg_out;
+    ms_reg_input_mux_a <= permout_a when perm_en_a = '1' else lfsr_xor_mux_a;
+    ms_reg_input_mux_b <= permout_b when perm_en_b = '1' else lfsr_xor_mux_b;
+    ms_reg_input_mux_c <= permout_c when perm_en_c = '1' else lfsr_xor_mux_c;
+    perm_input_a <= ms_reg_out_a;
+    perm_input_b <= ms_reg_out_b;
+    perm_input_c <= ms_reg_out_c;
 
     with data_count select
-        ms_out_mux2 <= ms_reg_out(CCW-1 downto 0) when 0,
-                       ms_reg_out((2*CCW)-1 downto CCW) when 1,
-                       ms_reg_out((3*CCW)-1 downto 2*CCW) when 2,
-                       ms_reg_out((4*CCW)-1 downto 3*CCW) when 3,
-                       ms_reg_out((5*CCW)-1 downto 4*CCW) when others;
-    --ms_out_mux2 <= ms_out_mux1 when data_count /= 4 else ms_reg_out(STATE_SIZE-1 downto 4*CCW);
-    data_bdo <= bdi_or_key_rev xor ms_out_mux2;
-    bdo <= reverse_byte(data_out_mux);
-    tag_mux <= tag_out(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out(31 downto 0);
-    data_out_mux <= data_bdo when bdo_sel ='0' else tag_mux;
+        ms_out_mux2_a <= ms_reg_out_a(CCW-1 downto 0) when 0,
+                         ms_reg_out_a((2*CCW)-1 downto CCW) when 1,
+                         ms_reg_out_a((3*CCW)-1 downto 2*CCW) when 2,
+                         ms_reg_out_a((4*CCW)-1 downto 3*CCW) when 3,
+                         ms_reg_out_a((5*CCW)-1 downto 4*CCW) when others;
+    with data_count select
+        ms_out_mux2_a <= ms_reg_out_b(CCW-1 downto 0) when 0,
+                         ms_reg_out_b((2*CCW)-1 downto CCW) when 1,
+                         ms_reg_out_b((3*CCW)-1 downto 2*CCW) when 2,
+                         ms_reg_out_b((4*CCW)-1 downto 3*CCW) when 3,
+                         ms_reg_out_b((5*CCW)-1 downto 4*CCW) when others;
+    with data_count select
+        ms_out_mux2_a <= ms_reg_out_c(CCW-1 downto 0) when 0,
+                         ms_reg_out_c((2*CCW)-1 downto CCW) when 1,
+                         ms_reg_out_c((3*CCW)-1 downto 2*CCW) when 2,
+                         ms_reg_out_c((4*CCW)-1 downto 3*CCW) when 3,
+                         ms_reg_out_c((5*CCW)-1 downto 4*CCW) when others;
+
+    data_bdo_a <= bdi_or_key_rev_a xor ms_out_mux2_a;
+    data_bdo_b <= bdi_or_key_rev_b xor ms_out_mux2_b;
+    data_bdo_c <= bdi_or_key_rev_c xor ms_out_mux2_c;
+    bdo_a <= reverse_byte(data_out_mux_a);
+    bdo_b <= reverse_byte(data_out_mux_b);
+    bdo_c <= reverse_byte(data_out_mux_c);
+
+    tag_mux_a <= tag_out_a(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out_a(31 downto 0);
+    tag_mux_b <= tag_out_b(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out_b(31 downto 0);
+    tag_mux_c <= tag_out_c(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out_c(31 downto 0);
+
+    data_out_mux_a <= data_bdo_a when bdo_sel ='0' else tag_mux_a;
+    data_out_mux_b <= data_bdo_b when bdo_sel ='0' else tag_mux_b;
+    data_out_mux_c <= data_bdo_c when bdo_sel ='0' else tag_mux_c;
     
 end behavioral;
 
