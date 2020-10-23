@@ -22,6 +22,51 @@ use work.Design_pkg.all;
 use work.elephant_constants.all;
 
 entity CryptoCore is
+    generic (
+        WIDTH               : integer := 128
+    );
+    
+    port (
+        clk                 : in   std_logic;
+        rst                 : in   std_logic;
+        --PreProcessor===============================================
+        ----!key----------------------------------------------------
+        key_a               : in   std_logic_vector (CCSW    -1 downto 0);
+        key_b               : in   std_logic_vector (CCSW    -1 downto 0);
+        key_c               : in   std_logic_vector (CCSW    -1 downto 0);
+        key_valid           : in   std_logic;
+        key_update          : in   std_logic;
+        key_ready           : out  std_logic;
+        ----!Data----------------------------------------------------
+        bdi_a               : in   std_logic_vector (CCW     -1 downto 0);
+        bdi_b               : in   std_logic_vector (CCW     -1 downto 0);
+        bdi_c               : in   std_logic_vector (CCW     -1 downto 0);
+        bdi_valid           : in   std_logic;
+        bdi_ready           : out  std_logic;
+        bdi_pad_loc         : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_valid_bytes     : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_size            : in   std_logic_vector (3       -1 downto 0);
+        bdi_eot             : in   std_logic;
+        bdi_eoi             : in   std_logic;
+        bdi_type            : in   std_logic_vector (4       -1 downto 0);
+        decrypt_in          : in   std_logic;
+        hash_in             : in   std_logic;
+        --!Post Processor=========================================
+        bdo_a               : out  std_logic_vector (CCW     -1 downto 0);
+        bdo_b               : out  std_logic_vector (CCW     -1 downto 0);
+        bdo_c               : out  std_logic_vector (CCW     -1 downto 0);
+        bdo_valid           : out  std_logic;
+        bdo_ready           : in   std_logic;
+        bdo_type            : out  std_logic_vector (4       -1 downto 0);
+        bdo_valid_bytes     : out  std_logic_vector (CCWdiv8 -1 downto 0);
+        end_of_block        : out  std_logic;
+        msg_auth_valid      : out  std_logic;
+        msg_auth_ready      : in   std_logic;
+        msg_auth            : out  std_logic;
+        
+        rdi_data            : in   std_logic_vector(RW       -1 downto 0)
+    );
+/*
     Port (
         clk             : in   STD_LOGIC;
         rst             : in   STD_LOGIC;
@@ -54,6 +99,7 @@ entity CryptoCore is
         msg_auth_ready  : in   STD_LOGIC;
         msg_auth        : out  STD_LOGIC
     );
+*/
 end CryptoCore;
 
 architecture behavioral of CryptoCore is
