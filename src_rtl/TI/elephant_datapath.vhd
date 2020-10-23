@@ -173,14 +173,12 @@ begin
         );
     DATAP_LFSR: entity work.elephant_datapath_lfsr
         port map(
-            load_key_a    => datap_lfsr_load_a,
-            load_key_b    => datap_lfsr_load_b,
-            load_key_c    => datap_lfsr_load_c,
             clk         => clk,
+            en          => datap_lfsr_en,
+            load_key    => datap_lfsr_load,
             key_in_a      => key_out_a,
             key_in_b      => key_out_b,
             key_in_c      => key_out_c,
-            en          => datap_lfsr_en,
             ele_lfsr_output_a => datap_lfsr_out_a
             ele_lfsr_output_b => datap_lfsr_out_b
             ele_lfsr_output_c => datap_lfsr_out_c
