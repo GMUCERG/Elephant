@@ -22,10 +22,6 @@ use work.Design_pkg.all;
 use work.elephant_constants.all;
 
 entity CryptoCore is
-    generic (
-        WIDTH               : integer := 128
-    );
-    
     port (
         clk                 : in   std_logic;
         rst                 : in   std_logic;
@@ -66,45 +62,11 @@ entity CryptoCore is
         
         rdi_data            : in   std_logic_vector(RW       -1 downto 0)
     );
-/*
-    Port (
-        clk             : in   STD_LOGIC;
-        rst             : in   STD_LOGIC;
-        --PreProcessor===============================================
-        ----!key----------------------------------------------------
-        key             : in   STD_LOGIC_VECTOR (CCSW     -1 downto 0);
-        key_valid       : in   STD_LOGIC;
-        key_ready       : out  STD_LOGIC;
-        ----!Data----------------------------------------------------
-        bdi             : in   STD_LOGIC_VECTOR (CCW     -1 downto 0);
-        bdi_valid       : in   STD_LOGIC;
-        bdi_ready       : out  STD_LOGIC;
-        bdi_pad_loc     : in   STD_LOGIC_VECTOR (CCWdiv8 -1 downto 0);
-        bdi_valid_bytes : in   STD_LOGIC_VECTOR (CCWdiv8 -1 downto 0);
-        bdi_size        : in   STD_LOGIC_VECTOR (3       -1 downto 0);
-        bdi_eot         : in   STD_LOGIC;
-        bdi_eoi         : in   STD_LOGIC;
-        bdi_type        : in   STD_LOGIC_VECTOR (4       -1 downto 0);
-        decrypt_in      : in   STD_LOGIC;
-        key_update      : in   STD_LOGIC;
-        hash_in         : in   std_logic;
-        --!Post Processor=========================================
-        bdo             : out  STD_LOGIC_VECTOR (CCW      -1 downto 0);
-        bdo_valid       : out  STD_LOGIC;
-        bdo_ready       : in   STD_LOGIC;
-        bdo_type        : out  STD_LOGIC_VECTOR (4       -1 downto 0);
-        bdo_valid_bytes : out  STD_LOGIC_VECTOR (CCWdiv8 -1 downto 0);
-        end_of_block    : out  STD_LOGIC;
-        msg_auth_valid  : out  STD_LOGIC;
-        msg_auth_ready  : in   STD_LOGIC;
-        msg_auth        : out  STD_LOGIC
-    );
-*/
 end CryptoCore;
 
 architecture behavioral of CryptoCore is
     --internal signals for datapath
-    signal bdo_s: std_logic_vector(CCW - 1 downto 0);
+    signal bdo_sa, bdo_sb, bdo_sc: std_logic_vector(CCW - 1 downto 0);
     signal bdo_sel: std_logic;
     signal saving_bdo: std_logic;
     signal bdi_size_intern: std_logic_vector(1 downto 0);
@@ -146,8 +108,12 @@ architecture behavioral of CryptoCore is
 begin
     ELEPHANT_DATAP: entity work.elephant_datapath
         port map(
-            key        => key,
-            bdi        => bdi,
+            key_a        => key_a,
+            key_b        => key_b,
+            key_c        => key_c,
+            bdi_a        => bdi_a,
+            bdi_b        => bdi_b,
+            bdi_c        => bdi_c,
             bdi_size => bdi_size_intern,
             data_type_sel => data_type_sel,
             
@@ -166,7 +132,9 @@ begin
             datap_lfsr_load => datap_lfsr_load,
             datap_lfsr_en => datap_lfsr_en,
             
-            bdo => bdo_s,
+            bdo_a => bdo_sa,
+            bdo_b => bdo_sb,
+            bdo_c => bdo_sc,
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
             data_count => data_cnt_int,
@@ -174,7 +142,9 @@ begin
             clk        => clk
         );
 
-    
+        bdo_a <= bdo_sa;
+        bdo_b <= bdo_sb;
+        bdo_c <= bdo_sc;
 state_control: process(all)
 begin
     bdo_valid <= '0';
@@ -189,7 +159,6 @@ begin
     key_ready <= '0';
     bdi_ready <= '0';
     bdi_size_intern <= bdi_size(1 downto 0);
-    bdo <= bdo_s;
     data_type_sel <= '0';
 
     load_data_en <= '0';
@@ -508,13 +477,13 @@ begin
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
-                    if (bdi /= bdo_s) then
+                    if (bdi_a /= bdo_sa) then
                         msg_auth <= '0';
                     else
                         msg_auth <= tag_verified;
                     end if;
                 else
-                    if bdi /= bdo_s then
+                    if bdi_a /= bdo_sa then
                         n_tag_verified <= '0';
                     end if;
                 end if;

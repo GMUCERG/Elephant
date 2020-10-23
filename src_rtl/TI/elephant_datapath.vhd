@@ -157,16 +157,12 @@ begin
 
     PERM: entity work.elephant_perm
         port map(
+            clk => clk,
+            load_lfsr => load_lfsr,
+            perm_count => perm_count,
             input_a => perm_input_a,
             input_b => perm_input_a,
             input_c => perm_input_c,
-            clk => clk,
-            perm_count_a => perm_count_a,
-            perm_count_b => perm_count_b,
-            perm_count_c => perm_count_c,
-            load_lfsr_a => load_lfsr_a,
-            load_lfsr_b => load_lfsr_b,
-            load_lfsr_c => load_lfsr_c,
             output_a => permout_a,
             output_b => permout_b,
             output_c => permout_c
@@ -179,8 +175,8 @@ begin
             key_in_a      => key_out_a,
             key_in_b      => key_out_b,
             key_in_c      => key_out_c,
-            ele_lfsr_output_a => datap_lfsr_out_a
-            ele_lfsr_output_b => datap_lfsr_out_b
+            ele_lfsr_output_a => datap_lfsr_out_a,
+            ele_lfsr_output_b => datap_lfsr_out_b,
             ele_lfsr_output_c => datap_lfsr_out_c
         );
     p_ms_reg: process(clk, ms_en)
@@ -325,9 +321,9 @@ begin
     tag_input_c <= lfsr_xor_mux_c(TAG_SIZE_BITS-1 downto 0) xor tag_out_c when tag_reset = '0' else (others => '0');
 
     --Logic for ms_reg_mux and perm
-    ms_reg_input_mux_a <= permout_a when perm_en_a = '1' else lfsr_xor_mux_a;
-    ms_reg_input_mux_b <= permout_b when perm_en_b = '1' else lfsr_xor_mux_b;
-    ms_reg_input_mux_c <= permout_c when perm_en_c = '1' else lfsr_xor_mux_c;
+    ms_reg_input_mux_a <= permout_a when perm_en = '1' else lfsr_xor_mux_a;
+    ms_reg_input_mux_b <= permout_b when perm_en = '1' else lfsr_xor_mux_b;
+    ms_reg_input_mux_c <= permout_c when perm_en = '1' else lfsr_xor_mux_c;
     perm_input_a <= ms_reg_out_a;
     perm_input_b <= ms_reg_out_b;
     perm_input_c <= ms_reg_out_c;
@@ -339,13 +335,13 @@ begin
                          ms_reg_out_a((4*CCW)-1 downto 3*CCW) when 3,
                          ms_reg_out_a((5*CCW)-1 downto 4*CCW) when others;
     with data_count select
-        ms_out_mux2_a <= ms_reg_out_b(CCW-1 downto 0) when 0,
+        ms_out_mux2_b <= ms_reg_out_b(CCW-1 downto 0) when 0,
                          ms_reg_out_b((2*CCW)-1 downto CCW) when 1,
                          ms_reg_out_b((3*CCW)-1 downto 2*CCW) when 2,
                          ms_reg_out_b((4*CCW)-1 downto 3*CCW) when 3,
                          ms_reg_out_b((5*CCW)-1 downto 4*CCW) when others;
     with data_count select
-        ms_out_mux2_a <= ms_reg_out_c(CCW-1 downto 0) when 0,
+        ms_out_mux2_c <= ms_reg_out_c(CCW-1 downto 0) when 0,
                          ms_reg_out_c((2*CCW)-1 downto CCW) when 1,
                          ms_reg_out_c((3*CCW)-1 downto 2*CCW) when 2,
                          ms_reg_out_c((4*CCW)-1 downto 3*CCW) when 3,

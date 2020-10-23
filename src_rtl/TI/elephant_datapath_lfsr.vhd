@@ -27,8 +27,8 @@ entity elephant_datapath_lfsr is
         key_in_a: in std_logic_vector(STATE_SIZE-1 downto 0);
         key_in_b: in std_logic_vector(STATE_SIZE-1 downto 0);
         key_in_c: in std_logic_vector(STATE_SIZE-1 downto 0);
-        ele_lfsr_output_a: out std_logic_vector(STATE_SIZE+16-1 downto 0)
-        ele_lfsr_output_b: out std_logic_vector(STATE_SIZE+16-1 downto 0)
+        ele_lfsr_output_a: out std_logic_vector(STATE_SIZE+16-1 downto 0);
+        ele_lfsr_output_b: out std_logic_vector(STATE_SIZE+16-1 downto 0);
         ele_lfsr_output_c: out std_logic_vector(STATE_SIZE+16-1 downto 0)
     );
 end elephant_datapath_lfsr;
@@ -62,11 +62,11 @@ begin
 
 
     lfsr_input_a <= lfsr_temp_rot_a & lfsr_output_a(STATE_SIZE+16-1 downto 8) when
-                        load_key_a = '0' else  key_in_a & x"0000";
+                        load_key = '0' else  key_in_a & x"0000";
     lfsr_input_b <= lfsr_temp_rot_b & lfsr_output_b(STATE_SIZE+16-1 downto 8) when
-                        load_key_b = '0' else  key_in_b & x"0000";
+                        load_key = '0' else  key_in_b & x"0000";
     lfsr_input_c <= lfsr_temp_rot_c & lfsr_output_c(STATE_SIZE+16-1 downto 8) when
-                        load_key_c = '0' else  key_in_c & x"0000";
+                        load_key = '0' else  key_in_c & x"0000";
 
     ele_lfsr_output_a <= lfsr_output_a;
     ele_lfsr_output_b <= lfsr_output_b;
