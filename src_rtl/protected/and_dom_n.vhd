@@ -58,3 +58,4 @@ begin
     Q1 <= reg2 xor reg4;
 
 end behav;
+
