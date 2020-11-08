@@ -27,7 +27,7 @@ entity elephant_datapath_lfsr_protected is
         key_in_a: in std_logic_vector(STATE_SIZE-1 downto 0);
         key_in_b: in std_logic_vector(STATE_SIZE-1 downto 0);
         ele_lfsr_output_a: out std_logic_vector(STATE_SIZE+16-1 downto 0);
-        ele_lfsr_output_b: out std_logic_vector(STATE_SIZE+16-1 downto 0);
+        ele_lfsr_output_b: out std_logic_vector(STATE_SIZE+16-1 downto 0)
     );
 end elephant_datapath_lfsr_protected;
 

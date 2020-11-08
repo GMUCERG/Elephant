@@ -27,6 +27,7 @@ entity elephant_datapath_protected is
         key_b: in std_logic_vector(CCW_SIZE-1 downto 0);
         bdi_a: in std_logic_vector(CCW_SIZE-1 downto 0);
         bdi_b: in std_logic_vector(CCW_SIZE-1 downto 0);
+        random: in std_logic_vector(2 downto 0);
         bdi_size: in std_logic_vector(1 downto 0);
         data_type_sel: std_logic;
 
@@ -44,6 +45,7 @@ entity elephant_datapath_protected is
         --Signals for permutation
         perm_en: in std_logic;
         load_lfsr: in std_logic;
+        en_lfsr:in std_logic;
         
         datap_lfsr_load: in std_logic;
         datap_lfsr_en: in std_logic;
@@ -53,7 +55,6 @@ entity elephant_datapath_protected is
         bdo_sel: in std_logic;
         saving_bdo: in std_logic;
         data_count: in integer range 0 to BLOCK_SIZE + 1;
-        perm_count: in integer range 0 to PERM_CYCLES;
         clk: in std_logic
     );
 end elephant_datapath_protected;
@@ -125,17 +126,18 @@ architecture behavioral of elephant_datapath_protected is
     
 begin
 
-    PERM: entity work.elephant_perm
+    PERM: entity work.elephant_perm_protected
         port map(
             clk => clk,
             load_lfsr => load_lfsr,
-            perm_count => perm_count,
+            en_lfsr => en_lfsr,
             input_a => perm_input_a,
             input_b => perm_input_a,
+            random => random,
             output_a => permout_a,
-            output_b => permout_b,
+            output_b => permout_b
         );
-    DATAP_LFSR: entity work.elephant_datapath_lfsr
+    DATAP_LFSR: entity work.elephant_datapath_lfsr_protected
         port map(
             clk         => clk,
             en          => datap_lfsr_en,
@@ -143,7 +145,7 @@ begin
             key_in_a      => key_out_a,
             key_in_b      => key_out_b,
             ele_lfsr_output_a => datap_lfsr_out_a,
-            ele_lfsr_output_b => datap_lfsr_out_b,
+            ele_lfsr_output_b => datap_lfsr_out_b
         );
     p_ms_reg: process(clk, ms_en)
     begin
