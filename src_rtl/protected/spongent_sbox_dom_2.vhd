@@ -29,9 +29,9 @@ entity spongent_sbox_dom_2 is
         share2: in std_logic_vector(3 downto 0);
         random: in std_logic_vector(2 downto 0);
         output_s1:out std_logic_vector(3 downto 0);
-        output_s2:out std_logic_vector(3 downto 0);
-        input: in integer range 0 to 15;
-        output: out integer range 0 to 15
+        output_s2:out std_logic_vector(3 downto 0)
+        --input: in integer range 0 to 15;
+        --output: out integer range 0 to 15
     );
 end spongent_sbox_dom_2;
 
@@ -58,7 +58,7 @@ architecture behav of spongent_sbox_dom_2 is
     attribute keep of and320 : signal is "true";
 
 begin
-    output <= to_integer(unsigned(sbox(input)));
+    --output <= to_integer(unsigned(sbox(input)));
 
     output_s1(0) <= share1(0) xor share1(1) xor and21(0) xor share1(3);
     output_s2(0) <= share2(0) xor share2(1) xor and21(1) xor share2(3);
