@@ -19,7 +19,7 @@ use ieee.numeric_std.all;
 use ieee.math_real.all;
 use work.elephant_constants.all;
 
-entity elephant_datapath_lfsr is
+entity elephant_datapath_lfsr_protected is
     port(
         clk: in std_logic;
         en: in std_logic;
@@ -29,9 +29,9 @@ entity elephant_datapath_lfsr is
         ele_lfsr_output_a: out std_logic_vector(STATE_SIZE+16-1 downto 0);
         ele_lfsr_output_b: out std_logic_vector(STATE_SIZE+16-1 downto 0);
     );
-end elephant_datapath_lfsr;
+end elephant_datapath_lfsr_protected;
 
-architecture behavioral of elephant_datapath_lfsr is
+architecture behavioral of elephant_datapath_lfsr_protected is
     signal lfsr_input_a: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_input_b: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_output_a: std_logic_vector(STATE_SIZE+16-1 downto 0);
