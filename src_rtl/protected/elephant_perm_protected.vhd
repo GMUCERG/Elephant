@@ -26,7 +26,7 @@ entity elephant_perm_protected is
         en_lfsr: in std_logic;
         input_a: in std_logic_vector(STATE_SIZE-1 downto 0);
         input_b: in std_logic_vector(STATE_SIZE-1 downto 0);
-        random: in std_logic_vector(2 downto 0);
+        random: in std_logic_vector(559 downto 0);
         output_a: out std_logic_vector(STATE_SIZE-1 downto 0);
         output_b: out std_logic_vector(STATE_SIZE-1 downto 0)
     );
@@ -54,7 +54,7 @@ begin
             end if;
         end if;
     end process;
-    rev_lfsr <= lfsr(0) & lfsr(1) & lfsr(2) & lfsr(3) & lfsr(4) & lfsr(5) & lfsr(6);-- to 6);
+    rev_lfsr <= lfsr(0) & lfsr(1) & lfsr(2) & lfsr(3) & lfsr(4) & lfsr(5) & lfsr(6);
 
 
     --Using the LFSR for performing one perm cycle
@@ -71,7 +71,7 @@ begin
                 clk => clk,
                 share1 => input_array_a(i*4 + 3 downto i*4),
                 share2 => input_array_b(i*4 + 3 downto i*4),
-                random => random,
+                random => random(i*14 + 13 downto i*14),
                 output_s1 => state_sbox_array_a(i*4+3 downto i*4),
                 output_s2 => state_sbox_array_b(i*4+3 downto i*4)
             );
