@@ -27,7 +27,7 @@ entity spongent_sbox_dom_2 is
         clk: in std_logic;
         share1: in std_logic_vector(3 downto 0);
         share2: in std_logic_vector(3 downto 0);
-        random: in std_logic_vector(2 downto 0);
+        random: in std_logic_vector(13 downto 0);
         output_s1:out std_logic_vector(3 downto 0);
         output_s2:out std_logic_vector(3 downto 0)
         --input: in integer range 0 to 15;
@@ -39,11 +39,11 @@ architecture behav of spongent_sbox_dom_2 is
     attribute keep_hierarchy : string;
     attribute keep_hierarchy of behav : architecture is "true";
 
-    type rom_array is array (0 to 15) of std_logic_vector(0 to 3);
-    constant sbox: rom_array :=(
-        x"e", x"d", x"b", x"0", x"2", x"1", x"4", x"f",
-        x"7", x"a", x"8", x"5", x"9", x"c", x"3", x"6"
-    );
+--    type rom_array is array (0 to 15) of std_logic_vector(0 to 3);
+--    constant sbox: rom_array :=(
+--        x"e", x"d", x"b", x"0", x"2", x"1", x"4", x"f",
+--        x"7", x"a", x"8", x"5", x"9", x"c", x"3", x"6"
+--    );
     signal and10, and21, and30, and31, and32: std_logic_vector(1 downto 0);
     signal and321, and310, and320: std_logic_vector(1 downto 0);
 
@@ -83,7 +83,7 @@ begin
             x1 => share2(3),
             y1 => share2(2),
             z1 => share2(1),
-            rand => random,
+            rand => random(2 downto 0),
             o0 => and321(0),
             o1 => and321(1)
         );
@@ -96,7 +96,7 @@ begin
             x1 => share2(3),
             y1 => share2(1),
             z1 => share2(0),
-            rand => random,
+            rand => random(5 downto 3),
             o0 => and310(0),
             o1 => and310(1)
         );
@@ -109,7 +109,7 @@ begin
             x1 => share2(3),
             y1 => share2(2),
             z1 => share2(0),
-            rand => random,
+            rand => random(8 downto 6),
             o0 => and320(0),
             o1 => and320(1)
         );
@@ -120,7 +120,7 @@ begin
             X1 => share2(0 downto 0),
             Y0 => share1(1 downto 1),
             Y1 => share2(1 downto 1),
-            Z  => random(0 downto 0),
+            Z  => random(9 downto 9),
             Q0 => and10(0 downto 0),
             Q1 => and10(1 downto 1)
         );
@@ -131,7 +131,7 @@ begin
             X1 => share2(1 downto 1),
             Y0 => share1(2 downto 2),
             Y1 => share2(2 downto 2),
-            Z  => random(0 downto 0),
+            Z  => random(10 downto 10),
             Q0 => and21(0 downto 0),
             Q1 => and21(1 downto 1)
         );
@@ -142,7 +142,7 @@ begin
             X1 => share2(0 downto 0),
             Y0 => share1(3 downto 3),
             Y1 => share2(3 downto 3),
-            Z  => random(0 downto 0),
+            Z  => random(11 downto 11),
             Q0 => and30(0 downto 0),
             Q1 => and30(1 downto 1)
         );
@@ -153,7 +153,7 @@ begin
             X1 => share2(1 downto 1),
             Y0 => share1(3 downto 3),
             Y1 => share2(3 downto 3),
-            Z  => random(0 downto 0),
+            Z  => random(12 downto 12),
             Q0 => and31(0 downto 0),
             Q1 => and31(1 downto 1)
         );
@@ -164,7 +164,7 @@ begin
             X1 => share2(2 downto 2),
             Y0 => share1(3 downto 3),
             Y1 => share2(3 downto 3),
-            Z  => random(0 downto 0),
+            Z  => random(13 downto 13),
             Q0 => and32(0 downto 0),
             Q1 => and32(1 downto 1)
         );
