@@ -82,6 +82,96 @@ begin
     iv  <= seed(512-1 downto 464)&x"00000000" & seed(384-1 downto 336)&x"00000000" & seed(256-1 downto 208)&x"00000000" & seed(128-1 downto 80)&x"00000000";
     
     end generate instance4;
+    
+    instance5: if (N = 5) generate
+
+    key <= seed(512 + 80 -1 downto 512) &
+           seed(464-1 downto 384)       & 
+           seed(336-1 downto 256)       & 
+           seed(208 -1 downto 128)      & 
+           seed(80 -1 downto 0);
+    iv  <= seed(512 + 128 -1 downto 512+80) &x"00000000" &
+           seed(512-1 downto 464)           &x"00000000" & 
+           seed(384-1 downto 336)           &x"00000000" & 
+           seed(256-1 downto 208)           &x"00000000" & 
+           seed(128-1 downto 80)            &x"00000000";
+    
+    end generate instance5;
+    
+     instance6: if (N = 6) generate
+
+    key <= seed(512 + 128 + 80 -1 downto 512 + 128) &
+           seed(512 + 80 -1 downto 512) &
+           seed(464-1 downto 384)       & 
+           seed(336-1 downto 256)       & 
+           seed(208 -1 downto 128)      & 
+           seed(80 -1 downto 0);
+    iv  <= seed(512 +128+ 128 -1 downto 512+128+80) &x"00000000" &
+           seed(512 + 128 -1 downto 512+80) &x"00000000" &
+           seed(512-1 downto 464)           &x"00000000" & 
+           seed(384-1 downto 336)           &x"00000000" & 
+           seed(256-1 downto 208)           &x"00000000" & 
+           seed(128-1 downto 80)            &x"00000000";
+    
+    end generate instance6;
+
+    instance7: if (N = 7) generate
+    key <= seed(848 -1 downto 768) &
+           seed(720 -1 downto 640) &
+           seed(512 + 80 -1 downto 512) &
+           seed(464-1 downto 384)       & 
+           seed(336-1 downto 256)       & 
+           seed(208 -1 downto 128)      & 
+           seed(80 -1 downto 0);
+    iv  <= seed(896-1 downto 848)           &x"00000000" &
+           seed(768-1 downto 720)           &x"00000000" &
+           seed(640-1 downto 592)           &x"00000000" &
+           seed(512-1 downto 464)           &x"00000000" & 
+           seed(384-1 downto 336)           &x"00000000" & 
+           seed(256-1 downto 208)           &x"00000000" & 
+           seed(128-1 downto 80)            &x"00000000";
+    end generate instance7;
+
+    instance8: if (N = 7) generate
+    key <= seed(976 -1 downto 896) &
+           seed(848 -1 downto 768) &
+           seed(720 -1 downto 640) &
+           seed(512 + 80 -1 downto 512) &
+           seed(464-1 downto 384)       & 
+           seed(336-1 downto 256)       & 
+           seed(208 -1 downto 128)      & 
+           seed(80 -1 downto 0);
+    iv  <= seed(1024 -1 downto 976)         &x"00000000" &
+           seed(896-1 downto 848)           &x"00000000" &
+           seed(768-1 downto 720)           &x"00000000" &
+           seed(640-1 downto 592)           &x"00000000" &
+           seed(512-1 downto 464)           &x"00000000" & 
+           seed(384-1 downto 336)           &x"00000000" & 
+           seed(256-1 downto 208)           &x"00000000" & 
+           seed(128-1 downto 80)            &x"00000000";
+    end generate instance8;
+
+    instance9: if (N = 7) generate
+    key <= seed(1104 -1 downto 1024) &
+           seed(976 -1 downto 896)   &
+           seed(848 -1 downto 768)   &
+           seed(720 -1 downto 640)   &
+           seed(592 -1 downto 512)   &
+           seed(464-1 downto 384)    & 
+           seed(336-1 downto 256)    & 
+           seed(208 -1 downto 128)   & 
+           seed(80 -1 downto 0);
+    iv  <= seed(1152-1 downto 1104)         &x"00000000" &
+           seed(1024-1 downto 976)          &x"00000000" &
+           seed(896-1 downto 848)           &x"00000000" &
+           seed(768-1 downto 720)           &x"00000000" &
+           seed(640-1 downto 592)           &x"00000000" &
+           seed(512-1 downto 464)           &x"00000000" & 
+           seed(384-1 downto 336)           &x"00000000" & 
+           seed(256-1 downto 208)           &x"00000000" & 
+           seed(128-1 downto 80)            &x"00000000";
+    end generate instance9;
+
 
 trivium_primitive_basic: entity work.trivium(behavioral)
 	generic map(

@@ -59,8 +59,10 @@ entity CryptoCore is
         msg_auth_valid      : out  std_logic;
         msg_auth_ready      : in   std_logic;
         msg_auth            : out  std_logic;
-        
-        rdi_data            : in   std_logic_vector(RW       -1 downto 0)
+        --rdi data to seed PRNG
+        rdi_valid           : in   std_logic;
+        rdi_ready           : out  std_logic; 
+        rdi_data            : in   std_logic_vector(RW-1 downto 0)
     );
 end CryptoCore;
 
@@ -83,7 +85,7 @@ architecture behavioral of CryptoCore is
     signal ms_en: std_logic;
     
     --Signals for permutation
-    signal load_lfsr:std_logic;
+    signal load_lfsr, en_lfsr:std_logic;
     signal perm_en: std_logic;
     
     --Signals for datapath lsfr
@@ -104,16 +106,27 @@ architecture behavioral of CryptoCore is
     signal append_one, n_append_one: std_logic;
     signal decrypt_op, n_decrypt_op: std_logic;
     signal n_tag_verified, tag_verified :std_logic;
+
+    signal en_seed_sipo : std_logic;
+    signal reseed, prng_rdi_valid: std_logic;
+    signal prng_rdi_data : std_logic_vector(NUM_TRIVIUM_UNITS*64-1 downto 0);
+    signal seed : std_logic_vector(NUM_TRIVIUM_UNITS*128-1 downto 0);
+    signal bdi_bc, key_bc : std_logic_vector(CCW-1 downto 0);
     
 begin
-    ELEPHANT_DATAP: entity work.elephant_datapath
+    key_bc <= key_b xor key_c;
+    bdi_bc <= bdi_b xor bdi_c;
+
+    bdo_a <= bdo_sa;
+    bdo_b <= bdo_sb;
+
+    ELEPHANT_DATAP: entity work.elephant_datapath_protected
         port map(
             key_a        => key_a,
             key_b        => key_b,
-            key_c        => key_c,
             bdi_a        => bdi_a,
             bdi_b        => bdi_b,
-            bdi_c        => bdi_c,
+            random       => prng_rdi_data(559 downto 0),
             bdi_size => bdi_size_intern,
             data_type_sel => data_type_sel,
             
@@ -128,23 +141,41 @@ begin
 
             perm_en => perm_en,            
             load_lfsr  => load_lfsr,
+            en_lfsr    => en_lfsr,
             
             datap_lfsr_load => datap_lfsr_load,
             datap_lfsr_en => datap_lfsr_en,
             
             bdo_a => bdo_sa,
             bdo_b => bdo_sb,
-            bdo_c => bdo_sc,
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
             data_count => data_cnt_int,
-            perm_count => perm_cnt_int,
             clk        => clk
         );
+    trivium_inst : entity work.prng_trivium_enhanced(structural)
+    generic map (N => NUM_TRIVIUM_UNITS)
+    port map(
+        clk => clk,
+        rst => rst,
+        en_prng => '1',
+        seed => seed,
+        reseed => reseed,
+        reseed_ack => open,
+        rdi_data => prng_rdi_data,
+        rdi_ready => '1',
+        rdi_valid => prng_rdi_valid
+    );
 
-        bdo_a <= bdo_sa;
-        bdo_b <= bdo_sb;
-        bdo_c <= bdo_sc;
+    seed_sipo : process(clk)
+    begin
+        if rising_edge(clk) then
+            if en_seed_sipo = '1' then
+                seed <= seed(SEED_SIZE - RW -1 downto 0) & rdi_data;
+            end if;
+        end if;
+    end process;
+
 state_control: process(all)
 begin
     bdo_valid <= '0';

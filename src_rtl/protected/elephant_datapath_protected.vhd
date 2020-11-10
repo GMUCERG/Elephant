@@ -27,7 +27,7 @@ entity elephant_datapath_protected is
         key_b: in std_logic_vector(CCW_SIZE-1 downto 0);
         bdi_a: in std_logic_vector(CCW_SIZE-1 downto 0);
         bdi_b: in std_logic_vector(CCW_SIZE-1 downto 0);
-        random: in std_logic_vector(2 downto 0);
+        random: in std_logic_vector(559 downto 0);
         bdi_size: in std_logic_vector(1 downto 0);
         data_type_sel: std_logic;
 

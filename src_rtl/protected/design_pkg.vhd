@@ -22,6 +22,9 @@ package Design_pkg is
     -- Range definition must not change.
     constant AD_CNT_WIDTH    : integer range 4 to 64 := 32;  --! Width of AD Bit counter
     constant MSG_CNT_WIDTH   : integer range 4 to 64 := 32;  --! Width of MSG (PT/CT) Bit counter
+    constant NUM_TRIVIUM_UNITS : integer := 9; --560 bits 9  X*64
+    constant SEED_SIZE         : integer := NUM_TRIVIUM_UNITS * 128;
+
     --! Asynchronous and active-low reset.
     --! Can be set to `True` when targeting ASICs given that your CryptoCore supports it.
     --constant ASYNC_RSTN      : boolean := false;
