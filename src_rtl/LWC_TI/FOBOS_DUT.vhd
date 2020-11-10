@@ -40,11 +40,10 @@ entity FOBOS_DUT is
 
 generic(       
     W : integer:=32; -- pdi and do width (mulltiple of 4)
-    SW: integer:=32;  -- sdi width (multiple of 4)
-    RW: integer:=64 -- rdi width which will be supplied to LWC                                   
+    SW: integer:=32  -- sdi width (multiple of 4)
+    --RW: integer:=32 -- rdi width which will be supplied to LWC                                   
 );
 port(
-    
 	clk : in std_logic;
 	rst : in std_logic;
 	
@@ -55,9 +54,6 @@ port(
 
 	din	: in std_logic_vector(3 downto 0);
 	dout : out std_logic_vector(3 downto 0)
-	
-	--state_debug : out std_logic_vector(7 downto 0)
-	
 );
 
 end FOBOS_DUT;
@@ -68,11 +64,11 @@ architecture structural of FOBOS_DUT is
 
 constant PDI_FIFO_DEPTH : integer:=12; -- size of FIFOs (2^FIFO_DEPTH N-bit words)
 constant SDI_FIFO_DEPTH : integer:=12; -- size of FIFOs (2^FIFO_DEPTH N-bit words) 
---constant RDI_FIFO_DEPTH : integer:=2; -- size of FIFOs (2^FIFO_DEPTH N-bit words)
+constant RDI_FIFO_DEPTH : integer:=12; -- size of FIFOs (2^FIFO_DEPTH N-bit words)
 constant DO_FIFO_DEPTH : integer:=12; -- size of FIFOs (2^FIFO_DEPTH N-bit words)
 
 signal pdi_data : std_logic_vector(W-1 downto 0); 
-signal rdi_data : std_logic_vector(RW-1 downto 0); 
+signal rdi_data : std_logic_vector(W-1 downto 0); 
 signal sdi_data : std_logic_vector(SW-1 downto 0);
 signal pdi_valid, pdi_ready, sdi_valid, sdi_ready, rdi_valid, rdi_ready : std_logic; 
 
@@ -113,9 +109,9 @@ signal next_do_rd_cnt, do_rd_cnt : std_logic_vector(log2_ceil(W/4)-1 downto 0);
 signal ld_cnt_init, rd_cnt_init : std_logic;
 
 -- embedded random number generator
-constant RSEEDLEN : integer:=RW*2; -- assumed to be width of random data * 2
-signal rnd_reg : std_logic_vector(RSEEDLEN - 1 downto 0); -- random seed
-signal rnd_init : std_logic:='0';
+--constant RSEEDLEN : integer:=RW; -- assumed to be width of random data * 2
+--signal rnd_reg : std_logic_vector(RSEEDLEN - 1 downto 0); -- random seed
+--signal rnd_init : std_logic:='0';
 
 begin
 
@@ -140,10 +136,7 @@ victim: entity work.LWC(structure)
 port map(
 	clk => clk,
 	rst => start,  --! The FOBOS_DUT start signal meets requirements for synchronous resets used in 
-		       --! CAESAR or LWC HW Development Packages
-
--- data signals
-
+    -- data signals
 	pdi_data  => pdi_data,
 	pdi_valid => pdi_valid,
 	pdi_ready => pdi_ready,
@@ -157,12 +150,9 @@ port map(
 	do_valid => result_valid,
 
 ----! if rdi_interface for side-channel protected versions is required, uncomment the rdi interface
-   rdi_data => rdi_data,
-   rdi_ready => open, --rdi_ready, not required in this implementation
-   rdi_valid => rdi_valid
-
-    --state_debug => state_debug
-
+    rdi_data => rdi_data,
+    rdi_ready => rdi_ready, --open, not required in this implementation
+    rdi_valid => rdi_valid
 );
 
 in_rg0: entity work.dut_regn(behavioral)
@@ -464,32 +454,64 @@ rdi_ld_cnt_full <= '1' when (rdi_ld_cnt = (W/4)-1) else '0';
 
 --! Trivium-based PRNG
 
-rndnumgen: entity work.prng_trivium_enhanced(structural)
-     generic map(N => 1) -- number of Trivium instances, which provides 64 random bits per instance up to N = 4
-     port map(
-     clk => clk,
-     rst => rst,
-     en_prng => '1',
-     seed => rnd_reg,
-     reseed => rnd_init,
-     reseed_ack => open,
-     rdi_data => rdi_data,
-     rdi_valid => rdi_valid,
-     rdi_ready => '1' -- assumed that PRNG will provide random bits on every clock cycle in current version
-     );
-     
+--rndnumgen: entity work.prng_trivium_enhanced(structural)
+--     generic map(N => 1) -- number of Trivium instances, which provides 64 random bits per instance up to N = 4
+--     port map(
+--     clk => clk,
+--     rst => rst,
+--     en_prng => '1',
+--     seed => rnd_reg,
+--     reseed => rnd_init,
+--     reseed_ack => open,
+--     rdi_data => rdi_data,
+--    rdi_valid => rdi_valid,
+--     rdi_ready => '1' -- assumed that PRNG will provide random bits on every clock cycle in current version
+--     );
+--     
 -- rseed write process
+--
+--process(clk)
+--
+--begin
+--	if (rising_edge(clk)) then
+--		if (rdi_fifo_buffer_en = '1') then
+--			rnd_reg <= rnd_reg(RSEEDLEN - 4 - 1 downto 0) & din;
+--		end if;
+--	end if;
+--end process;
 
-process(clk)
+rdi_fifo : entity work.dut_fifo(structure)
+    generic map(
+        G_LOG2DEPTH => RDI_FIFO_DEPTH,
+        G_W => W
+    )
+    port map(
 
-begin
-	if (rising_edge(clk)) then
-		if (rdi_fifo_buffer_en = '1') then
-			rnd_reg <= rnd_reg(RSEEDLEN - 4 - 1 downto 0) & din;
-		end if;
-	end if;
-end process;
+        clk => clk,
+        rst => rst,
+        reinit => rdi_fifo_reinit,
+        write => rdi_fifo_write,
+        read => rdi_fifo_read,
+        din => next_rdi_fifo_buffer,
+        dout => rdi_data,
+        almost_full => rdi_fifo_almost_full,
+        almost_empty => rdi_fifo_almost_empty,
+        full => rdi_fifo_full,
+        empty => rdi_fifo_empty
+        
+        );
 
+rdi_buffer_rg: entity work.dut_regn(behavioral)
+    generic map(N=> W)
+    port map(
+        clk => clk,
+        rst => rst,
+        en => rdi_fifo_buffer_en,
+        d => next_rdi_fifo_buffer,
+        q => rdi_fifo_buffer
+        );
+
+next_rdi_fifo_buffer <= rdi_fifo_buffer(W - 4 - 1 downto 0) & din;
 -- sdi_fifo
 -- reinit function not yet supported
 
@@ -689,7 +711,7 @@ fobos_ctrl: entity work.fobos_controller(behavioral)
     pdi_ready => pdi_ready,
     pdi_start => pdi_start,
     rdi_fifo_empty => rdi_fifo_empty,
-    rdi_ready => '0', -- rdi process disabled
+    rdi_ready => rdi_ready,
     rdi_start => rdi_start,
     sdi_start => sdi_start,
     sdi_fifo_empty => sdi_fifo_empty,
@@ -710,7 +732,7 @@ fobos_ctrl: entity work.fobos_controller(behavioral)
     pdi_valid => pdi_valid,
     pdi_cntr_init => pdi_cntr_init,
     rdi_fifo_read => rdi_fifo_read,
-    rdi_valid => open, -- process disabled
+    rdi_valid => rdi_valid,
     rdi_cntr_init => rdi_cntr_init,
     sdi_fifo_read => sdi_fifo_read,
     sdi_valid => sdi_valid,
@@ -719,10 +741,11 @@ fobos_ctrl: entity work.fobos_controller(behavioral)
     do_fifo_read => do_fifo_read,
     do_cntr => do_cntr_en_in,
     do_cntr_init => do_cntr_init,
+    
     fifo_buffer_en => fifo_buffer_en,
     ld_cnt_init => ld_cnt_init,
-    rd_cnt_init => rd_cnt_init,
-    rnd_init => rnd_init
+    rd_cnt_init => rd_cnt_init
+    --rnd_init => rnd_init
 	
     );
 
