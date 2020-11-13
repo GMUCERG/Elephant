@@ -26,21 +26,19 @@ component spongent_sbox_dom_2_again
         clk: in std_logic;
         share1: in std_logic_vector(3 downto 0);
         share2: in std_logic_vector(3 downto 0);
-        random: in std_logic_vector(13 downto 0);
+--        random: in std_logic_vector(13 downto 0);
+        random: in std_logic_vector(8 downto 0);
         output_s1:out std_logic_vector(3 downto 0);
-        output_s2:out std_logic_vector(3 downto 0);
-        output_s3:out std_logic_vector(3 downto 0);
-        output_s4:out std_logic_vector(3 downto 0)
-        --input : in integer range 0 to 15;
-        --output : out integer range 0 to 15
+        output_s2:out std_logic_vector(3 downto 0)
     );
 end component;
 
 
     signal input, output, x, y, rand : integer range 0 to 15;
     signal share1, share1_mod, share2: std_logic_vector(3 downto 0);
-    signal random: std_logic_vector(13 downto 0);
-    signal output_s1, output_s2, output_s3, output_s4, output_actual, output_actual_again: std_logic_vector(3 downto 0);
+    signal random: std_logic_vector(8 downto 0);
+--    signal random: std_logic_vector(13 downto 0);
+    signal output_s1, output_s2, output_actual: std_logic_vector(3 downto 0);
     signal clk : std_logic := '0';
 
     type rom_array is array (0 to 15) of std_logic_vector(0 to 3);
@@ -57,15 +55,10 @@ uut: spongent_sbox_dom_2_again
         share2 => share2,
         random => random,
         output_s1 => output_s1,
-        output_s2 => output_s2,
-        output_s3 => output_s3,
-        output_s4 => output_s4
-        --input => input,
-        --output => output
+        output_s2 => output_s2
     );
     clk <= not clk after 5 ns;
     output_actual <= output_s1 xor output_s2;
-    output_actual_again <= output_s3 xor output_s4;
     share1_mod <= share1 xor share2;
     output <= to_integer(unsigned(sbox(input)));
     
@@ -76,7 +69,8 @@ uut: spongent_sbox_dom_2_again
         share2 <= "0000";
         wait for 40 ns;
         for rand in 0 to 7 loop
-            random <= std_logic_vector(to_unsigned(rand,14));
+            random <= std_logic_vector(to_unsigned(rand,9));
+--            random <= std_logic_vector(to_unsigned(rand,14));
             for y in 0 to 15 loop
                 share2 <= std_logic_vector(to_unsigned(y,4));
                 for x in 0 to 15 loop
@@ -84,8 +78,7 @@ uut: spongent_sbox_dom_2_again
                     share1 <= std_logic_vector(to_unsigned(x,4));
                     wait for 10 ns;
                     wait for 10 ns;
-                    if output_actual /= std_logic_vector(to_unsigned(output, 4)) or 
-                       output_actual /= output_actual_again then
+                    if output_actual /= std_logic_vector(to_unsigned(output, 4)) then
                         report "Test failed outputs did not match" severity error;
                         assert false report "failure" severity failure;
                     end if;
