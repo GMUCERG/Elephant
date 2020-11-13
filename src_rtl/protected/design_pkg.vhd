@@ -16,13 +16,14 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use work.elephant_constants.all;
+use ieee.math_real.all;
 
 package Design_pkg is
     --! Adjust the bit counter widths to reduce ressource consumption.
     -- Range definition must not change.
     constant AD_CNT_WIDTH    : integer range 4 to 64 := 32;  --! Width of AD Bit counter
     constant MSG_CNT_WIDTH   : integer range 4 to 64 := 32;  --! Width of MSG (PT/CT) Bit counter
-    constant NUM_TRIVIUM_UNITS : integer := 9; --560 bits 9  X*64
+    constant NUM_TRIVIUM_UNITS : integer := integer(ceil(real(RANDOM_BITS_PER_SBOX*NUMBER_SBOXS)/real(64))); --360 bits 6  X*64
     constant SEED_SIZE         : integer := NUM_TRIVIUM_UNITS * 128;
 
     --! Asynchronous and active-low reset.

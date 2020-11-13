@@ -126,7 +126,7 @@ begin
             key_b        => key_b,
             bdi_a        => bdi_a,
             bdi_b        => bdi_b,
-            random       => prng_rdi_data(559 downto 0),
+            random       => prng_rdi_data(RANDOM_BITS_PER_SBOX*NUMBER_SBOXS - 1 downto 0),
             bdi_size => bdi_size_intern,
             data_type_sel => data_type_sel,
             
