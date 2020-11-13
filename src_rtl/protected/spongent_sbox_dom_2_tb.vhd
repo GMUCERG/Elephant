@@ -84,7 +84,8 @@ uut: spongent_sbox_dom_2_again
                     share1 <= std_logic_vector(to_unsigned(x,4));
                     wait for 10 ns;
                     wait for 10 ns;
-                    if output_actual /= std_logic_vector(to_unsigned(output, 4))  then
+                    if output_actual /= std_logic_vector(to_unsigned(output, 4)) or 
+                       output_actual /= output_actual_again then
                         report "Test failed outputs did not match" severity error;
                         assert false report "failure" severity failure;
                     end if;

@@ -114,12 +114,14 @@ begin
             Q1 => s_1xor2_and1(1)
         );
 
-    output_s3(1) <= not(share1(0) xor share1(1) xor s_1xor2_and1(0) xor
+    output_s3(1) <= not(share1(0) xor share1(1) xor
+                        s_1xor2_and1(0) xor
                         s_3and_0xor1_and_0xor2(0) xor
                         s_3and_1xor2_and_0xor3(0));
-    output_s4(1) <= not(share2(0) xor share2(1) xor s_1xor2_and1(1) xor
+    output_s4(1) <= share2(0) xor share2(1) xor
+                        s_1xor2_and1(1) xor
                         s_3and_0xor1_and_0xor2(1) xor
-                        s_3and_1xor2_and_0xor3(1));
+                        s_3and_1xor2_and_0xor3(1);
     E_3And0x1And0x2: entity work.and_3_input_2_share
         port map(
             clk => clk,
@@ -153,11 +155,11 @@ begin
                         s_1xor2_and1(0) xor
                         s_3and_0xor1_and_0xor2(0) xor
                         s_3and_1xor2_and_0xor3(0));
-    output_s4(2) <= not(share2(1) xor share2(2) xor
+    output_s4(2) <= share2(1) xor share2(2) xor
                         s_1xor2_and_1xor3(1) xor
                         s_1xor2_and1(1) xor
                         s_3and_0xor1_and_0xor2(1) xor
-                        s_3and_1xor2_and_0xor3(1));
+                        s_3and_1xor2_and_0xor3(1);
     E_s_1xor2_and_1xor3: entity work.and_dom
         port map(
             clk => clk,
@@ -175,11 +177,11 @@ begin
                         s_0xor3_and_0xor1(0) xor
                         s_1xor2_and1(0) xor
                         s_3and_1xor2_and_0xor3(0));
-    output_s4(3) <= not(share2(0) xor share2(2) xor share2(3) xor
+    output_s4(3) <= share2(0) xor share2(2) xor share2(3) xor
                         s_1xor2_and_1xor3(1) xor
                         s_0xor3_and_0xor1(1) xor
                         s_1xor2_and1(1) xor
-                        s_3and_1xor2_and_0xor3(1));
+                        s_3and_1xor2_and_0xor3(1);
     E_s_0xor3_and_0xor1: entity work.and_dom
         port map(
             clk => clk,
