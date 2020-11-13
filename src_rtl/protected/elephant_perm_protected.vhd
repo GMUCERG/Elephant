@@ -26,7 +26,7 @@ entity elephant_perm_protected is
         en_lfsr: in std_logic;
         input_a: in std_logic_vector(STATE_SIZE-1 downto 0);
         input_b: in std_logic_vector(STATE_SIZE-1 downto 0);
-        random: in std_logic_vector(559 downto 0);
+        random: in std_logic_vector(NUMBER_SBOXS*RANDOM_BITS_PER_SBOX - 1 downto 0);
         output_a: out std_logic_vector(STATE_SIZE-1 downto 0);
         output_b: out std_logic_vector(STATE_SIZE-1 downto 0)
     );
@@ -66,12 +66,12 @@ begin
 
     -- S-Boxes generation
     sbox_gen: for i in 39 downto 0 generate
-        SBOX_E: entity work.spongent_sbox_dom_2
+        SBOX_E: entity work.spongent_sbox_dom_2_again
             port map(
                 clk => clk,
                 share1 => input_array_a(i*4 + 3 downto i*4),
                 share2 => input_array_b(i*4 + 3 downto i*4),
-                random => random(i*14 + 13 downto i*14),
+                random => random((i+1)*RANDOM_BITS_PER_SBOX - 1 downto i*RANDOM_BITS_PER_SBOX),
                 output_s1 => state_sbox_array_a(i*4+3 downto i*4),
                 output_s2 => state_sbox_array_b(i*4+3 downto i*4)
             );

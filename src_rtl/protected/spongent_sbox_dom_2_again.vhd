@@ -27,7 +27,7 @@ entity spongent_sbox_dom_2_again is
         clk: in std_logic;
         share1: in std_logic_vector(3 downto 0);
         share2: in std_logic_vector(3 downto 0);
-        random: in std_logic_vector(8 downto 0);
+        random: in std_logic_vector(RANDOM_BITS_PER_SBOX-1 downto 0);
         output_s1:out std_logic_vector(3 downto 0);
         output_s2:out std_logic_vector(3 downto 0)
     );

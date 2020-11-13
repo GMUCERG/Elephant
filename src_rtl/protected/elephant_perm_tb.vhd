@@ -29,7 +29,7 @@ component elephant_perm_protected
         en_lfsr: in std_logic;
         input_a: in std_logic_vector(STATE_SIZE-1 downto 0);
         input_b: in std_logic_vector(STATE_SIZE-1 downto 0);
-        random: in std_logic_vector(559 downto 0);
+        random: in std_logic_vector(NUMBER_SBOXS*RANDOM_BITS_PER_SBOX - 1 downto 0);
         output_a:out std_logic_vector(STATE_SIZE-1 downto 0);
         output_b:out std_logic_vector(STATE_SIZE-1 downto 0)
     );
@@ -49,11 +49,11 @@ end component;
     signal perm_count : integer range 0 to PERM_CYCLES;
     signal x, y : integer range 0 to STATE_SIZE-1;
     signal share1, share1_mod, share2: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal random: std_logic_vector(559 downto 0);
+    signal random: std_logic_vector(NUMBER_SBOXS*RANDOM_BITS_PER_SBOX - 1 downto 0);
     signal output_s1, output_s2, output_actual, output_orig: std_logic_vector(STATE_SIZE-1 downto 0);
     signal clk, clk_slow, load_lfsr : std_logic := '1';
     signal en_lfsr : std_logic := '0';
-   
+
 begin
 uut: elephant_perm_protected
     port map(
@@ -87,7 +87,7 @@ uut2: elephant_perm
         wait for 40 ns;
         for rand in 3 to 5 loop
         --for rand in 0 to 7 loop
-            random <= std_logic_vector(to_unsigned(rand,560));
+            random <= std_logic_vector(to_unsigned(rand,NUMBER_SBOXS*RANDOM_BITS_PER_SBOX));
             for y in 0 to 2*STATE_SIZE-1 loop
                 share2 <= std_logic_vector(to_unsigned(y,STATE_SIZE));
                 for x in 0 to 2*(STATE_SIZE-1) loop
