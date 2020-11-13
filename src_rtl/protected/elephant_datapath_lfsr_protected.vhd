@@ -38,6 +38,19 @@ architecture behavioral of elephant_datapath_lfsr_protected is
     signal lfsr_output_b: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_temp_rot_a: std_logic_vector(7 downto 0);
     signal lfsr_temp_rot_b: std_logic_vector(7 downto 0);
+
+    attribute keep_hierarchy : string;
+    attribute keep_hierarchy of behavioral : architecture is "true";
+
+    attribute keep : string;
+    attribute keep of lfsr_input_a : signal is "true";
+    attribute keep of lfsr_input_b : signal is "true";
+    attribute keep of lfsr_output_a : signal is "true";
+    attribute keep of lfsr_output_b : signal is "true";
+    attribute keep of lfsr_temp_rot_a : signal is "true";
+    attribute keep of lfsr_temp_rot_b : signal is "true";
+
+    signal ele_lfsr_output_comb: std_logic_vector(STATE_SIZE+16-1 downto 0);
 begin
     --LFSR output
     --C code
@@ -59,6 +72,10 @@ begin
 
     ele_lfsr_output_a <= lfsr_output_a;
     ele_lfsr_output_b <= lfsr_output_b;
+
+    DEBUG_COMB: if DEBUG = 1 generate
+        ele_lfsr_output_comb <= lfsr_output_a xor lfsr_output_b;
+    end generate;
 
     p_lfsr_data: process(clk, en)
     begin

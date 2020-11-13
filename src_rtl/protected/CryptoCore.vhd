@@ -86,7 +86,7 @@ architecture behavioral of CryptoCore is
     
     --Signals for permutation
     signal load_lfsr, en_lfsr:std_logic;
-    signal perm_en: std_logic;
+    signal perm_sel: std_logic;
     
     --Signals for datapath lsfr
     signal datap_lfsr_load: std_logic;
@@ -98,8 +98,10 @@ architecture behavioral of CryptoCore is
 --    signal reset_perm_cnt: std_logic;
     signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
     
-    type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
-                       PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S, MDATA_NPUB, TAG_S);
+    type ctl_state is (RST_S, LOAD_SEED, START_PRNG, WAIT_PRNG,
+                       IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
+                       PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S,
+                       MDATA_NPUB, TAG_S);
     signal n_ctl_s, ctl_s, n_calling_state, calling_state: ctl_state;
     signal lfsr_loaded, n_lfsr_loaded: std_logic;
     signal done_state, n_done_state: std_logic;
@@ -112,6 +114,11 @@ architecture behavioral of CryptoCore is
     signal prng_rdi_data : std_logic_vector(NUM_TRIVIUM_UNITS*64-1 downto 0);
     signal seed : std_logic_vector(NUM_TRIVIUM_UNITS*128-1 downto 0);
     signal bdi_bc, key_bc : std_logic_vector(CCW-1 downto 0);
+
+    --signal first_blk, next_first_blk : std_logic;
+    --signal tag_valid, next_tag_valid : std_logic;
+    --signal bdi_eoi_r, next_bdi_eoi_r : std_logic;
+    --signal wrd_cnt, next_wrd_cnt : unsigned(5 - 1 downto 0);
     
 begin
     key_bc <= key_b xor key_c;
@@ -119,11 +126,12 @@ begin
 
     bdo_a <= bdo_sa;
     bdo_b <= bdo_sb;
+    bdo_c <= (others => '0');
 
     ELEPHANT_DATAP: entity work.elephant_datapath_protected
         port map(
             key_a        => key_a,
-            key_b        => key_b,
+            key_b        => key_bc,
             bdi_a        => bdi_a,
             bdi_b        => bdi_b,
             random       => prng_rdi_data(RANDOM_BITS_PER_SBOX*NUMBER_SBOXS - 1 downto 0),
@@ -139,7 +147,7 @@ begin
             tag_reset => tag_reset,
             ms_en => ms_en,
 
-            perm_en => perm_en,            
+            perm_sel => perm_sel,
             load_lfsr  => load_lfsr,
             en_lfsr    => en_lfsr,
             
@@ -202,7 +210,8 @@ begin
     ms_en <= '0';    
 
     load_lfsr <= '0';
-    perm_en <= '0';
+    en_lfsr <= '0';
+    perm_sel <= '0';
     datap_lfsr_load <= '0';
     datap_lfsr_en <= '0';
     
@@ -216,9 +225,36 @@ begin
     n_tag_verified <= tag_verified;
     n_perm_cnt_int <= 0;
     n_data_cnt_int <= data_cnt_int;
-    
+
+    reseed <= '0';
+    rdi_ready <= '0';
+    en_seed_sipo <= '0';
 
     case ctl_s is
+    when RST_S =>
+        n_ctl_s <= LOAD_SEED;
+    when LOAD_SEED =>
+        rdi_ready <= '1';
+        if rdi_valid = '1' then
+            en_seed_sipo <= '1';
+            if data_cnt_int = SEED_SIZE / RW -1 then
+                n_ctl_s <= START_PRNG;
+            else
+                n_ctl_s <= LOAD_SEED;
+            end if;
+            n_data_cnt_int <= data_cnt_int + 1;
+        else
+            n_ctl_s <= START_PRNG;
+        end if;
+    when START_PRNG =>
+        reseed <= '1';
+        n_ctl_s <= WAIT_PRNG;
+    when WAIT_PRNG =>
+        if prng_rdi_valid = '1' then
+            n_ctl_s <= IDLE;
+        else
+            n_ctl_s <= WAIT_PRNG;
+        end if;
     when IDLE =>
         n_lfsr_loaded <= '0';
         n_tag_verified <= '1';
@@ -235,13 +271,16 @@ begin
         end if;
     when STORE_KEY =>
         if data_cnt_int <= BLOCK_SIZE then
-            n_data_cnt_int <= data_cnt_int + 1;
-            if key_valid = '1' then
-                key_ready <= '1';
-                load_data_en <= '1';
-                data_type_sel <= '1'; --select key type
-                load_data_sel <= "01";
+            if data_cnt_int < KEY_SIZE then
+                if key_valid = '1' then
+                    n_data_cnt_int <= data_cnt_int + 1;
+                    key_ready <= '1';
+                    load_data_en <= '1';
+                    data_type_sel <= '1'; --select key type
+                    load_data_sel <= "01";
+                end if;
             else
+                n_data_cnt_int <= data_cnt_int + 1;
                 if data_cnt_int <= KEY_SIZE then
                     load_data_sel <= "00"; --zero pad
                     load_data_en <= '1';
@@ -258,9 +297,12 @@ begin
         end if;
     when PERM_KEY =>
         if perm_cnt_int < PERM_CYCLES then
-            perm_en <= '1';
+            perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
-            ms_en <= '1';
+            if perm_cnt_int mod 2 = 1 then
+                ms_en <= '1';
+                en_lfsr <= '1';
+            end if;
             if perm_cnt_int = PERM_CYCLES-1 then
                 --Save the perm key
                 key_en <= '1';
@@ -361,9 +403,12 @@ begin
             
     when PERM =>
         if perm_cnt_int < PERM_CYCLES then
-            perm_en <= '1';
+            perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
-            ms_en <= '1';
+            if perm_cnt_int mod 2 = 0 then
+                ms_en <= '1';
+                en_lfsr <= '1';
+            end if;
             if perm_cnt_int = PERM_CYCLES-1 then
                 n_ctl_s <= POST_PERM;
             end if;
@@ -529,7 +574,7 @@ begin
         perm_cnt_int <= n_perm_cnt_int;
         data_cnt_int <= n_data_cnt_int;
         if rst = '1' then
-            ctl_s <= IDLE;
+            ctl_s <= RST_S;
             calling_state <= IDLE;
             lfsr_loaded <= '0';
             done_state <= '0';

@@ -38,7 +38,7 @@ package Design_pkg is
     constant CCW             : integer :=32; --! variant dependent design parameters are assigned in body!
     constant CCWdiv8         : integer :=32/8; --! derived from parameters above, assigned in body.
     
-    constant RW              : integer := 32; --! This variable is used for random values (protected LWC)
+    --constant RW              : integer := 32; --! This variable is used for random values (protected LWC)
 
     --! design parameters exclusivly used by the LWC core implementations
     constant NPUB_SIZE       : integer := 96;  --! Npub size

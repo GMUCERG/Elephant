@@ -38,8 +38,20 @@ architecture behavior of elephant_perm_protected is
     
     signal input_array_a, state_sbox_array_a, player_array_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal input_array_b, state_sbox_array_b, player_array_b: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal input_array_comb, state_sbox_array_comb, player_array_comb: std_logic_vector(STATE_SIZE-1 downto 0);
+
+    attribute keep_hierarchy :string;
+    attribute keep_hierarchy of behavior : architecture is "true";
+    attribute keep : string;
+    attribute keep of lfsr : signal is "true";
+    attribute keep of rev_lfsr : signal is "true";
+    attribute keep of input_array_a : signal is "true";
+    attribute keep of state_sbox_array_a : signal is "true";
+    attribute keep of player_array_a : signal is "true";
+    attribute keep of input_array_b : signal is "true";
+    attribute keep of state_sbox_array_b : signal is "true";
+    attribute keep of player_array_b : signal is "true";
     
+    signal input_array_comb, state_sbox_array_comb, player_array_comb: std_logic_vector(STATE_SIZE-1 downto 0);
 
 begin
     -- Permutation LFSR does not have any inputs and does not require other shares
@@ -61,8 +73,6 @@ begin
     input_array_a <= (rev_lfsr xor input_a(STATE_SIZE - 1 downto 153)) &
                         input_a(152 downto 7) & (lfsr xor input_a(6 downto 0));
     input_array_b <= input_b; 
-    input_array_comb <= input_array_a xor input_array_b;
-
 
     -- S-Boxes generation
     sbox_gen: for i in 39 downto 0 generate
@@ -76,7 +86,6 @@ begin
                 output_s2 => state_sbox_array_b(i*4+3 downto i*4)
             );
     end generate;
-    state_sbox_array_comb <= state_sbox_array_a xor state_sbox_array_b;
 
     -- Player
     playerg: for j in 0 to 158 generate
@@ -85,7 +94,12 @@ begin
     end generate;
     player_array_a(STATE_SIZE - 1) <= state_sbox_array_a(STATE_SIZE - 1);
     player_array_b(STATE_SIZE - 1) <= state_sbox_array_b(STATE_SIZE - 1);
-    player_array_comb <= player_array_a xor player_array_b;
+
+    DEBUG_COMB: if DEBUG = 1 generate
+        input_array_comb <= input_array_a xor input_array_b;
+        state_sbox_array_comb <= state_sbox_array_a xor state_sbox_array_b;
+        player_array_comb <= player_array_a xor player_array_b;
+    end generate;
 
     output_a <= player_array_a;
     output_b <= player_array_b;

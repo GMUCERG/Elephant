@@ -43,7 +43,7 @@ entity elephant_datapath_protected is
         
         ms_en: in std_logic;
         --Signals for permutation
-        perm_en: in std_logic;
+        perm_sel: in std_logic;
         load_lfsr: in std_logic;
         en_lfsr:in std_logic;
         
@@ -60,79 +60,161 @@ entity elephant_datapath_protected is
 end elephant_datapath_protected;
 
 architecture behavioral of elephant_datapath_protected is
-    
+    attribute keep_hierarchy :string;
+    attribute keep_hierarchy of behavioral : architecture is "true";
+    attribute keep : string;
+
     signal permout_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal permout_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal permout_comb: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of permout_a : signal is "true";
+    attribute keep of permout_b : signal is "true";
+
     signal perm_input_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal perm_input_b: std_logic_vector(STATE_SIZE-1 downto 0);
-    
+    signal perm_input_comb: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of perm_input_a : signal is "true";
+    attribute keep of perm_input_b : signal is "true";
+
     signal datap_lfsr_out_a: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal datap_lfsr_out_b: std_logic_vector(STATE_SIZE+16-1 downto 0);
+    attribute keep of datap_lfsr_out_a : signal is "true";
+    attribute keep of datap_lfsr_out_b : signal is "true";
+
     signal lfsr_current_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_current_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_current_comb: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of lfsr_current_a : signal is "true";
+    attribute keep of lfsr_current_b : signal is "true";
+
     signal lfsr_next_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_next_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of lfsr_next_a : signal is "true";
+    attribute keep of lfsr_next_b : signal is "true";
+
     signal lfsr_prev_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_prev_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of lfsr_prev_a : signal is "true";
+    attribute keep of lfsr_prev_b : signal is "true";
+
     signal cur_ms_xor_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal cur_ms_xor_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of cur_ms_xor_a : signal is "true";
+    attribute keep of cur_ms_xor_b : signal is "true";
+
     signal prev_next_ms_xor_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal prev_next_ms_xor_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of prev_next_ms_xor_a : signal is "true";
+    attribute keep of prev_next_ms_xor_b : signal is "true";
+
     signal cur_next_ms_xor_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal cur_next_ms_xor_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of cur_next_ms_xor_a : signal is "true";
+    attribute keep of cur_next_ms_xor_b : signal is "true";
 
-    
     signal bdi_or_key_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal bdi_or_key_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of bdi_or_key_a : signal is "true";
+    attribute keep of bdi_or_key_b : signal is "true";
+
     signal bdi_or_key_rev_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal bdi_or_key_rev_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of bdi_or_key_rev_a : signal is "true";
+    attribute keep of bdi_or_key_rev_b : signal is "true";
+
     signal bdi_or_bdo_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal bdi_or_bdo_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of bdi_or_bdo_a : signal is "true";
+    attribute keep of bdi_or_bdo_b : signal is "true";
+
     signal padding_bdi_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal padding_bdi_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of padding_bdi_a : signal is "true";
+    attribute keep of padding_bdi_b : signal is "true";
 
     signal load_data_input_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal load_data_input_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of load_data_input_mux_a : signal is "true";
+    attribute keep of load_data_input_mux_b : signal is "true";
+
     signal load_data_output_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal load_data_output_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of load_data_output_a : signal is "true";
+    attribute keep of load_data_output_b : signal is "true";
+
     signal lfsr_xor_mux_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_xor_mux_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of lfsr_xor_mux_a : signal is "true";
+    attribute keep of lfsr_xor_mux_b : signal is "true";
     
     signal key_out_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal key_out_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of key_out_a : signal is "true";
+    attribute keep of key_out_b : signal is "true";
+
     signal npub_out_a: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
     signal npub_out_b: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
+    attribute keep of npub_out_a : signal is "true";
+    attribute keep of npub_out_b : signal is "true";
+
     signal tag_out_a: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     signal tag_out_b: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    attribute keep of tag_out_a : signal is "true";
+    attribute keep of tag_out_b : signal is "true";
+
     signal tag_input_a: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     signal tag_input_b: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
-    
-    
+    attribute keep of tag_input_a : signal is "true";
+    attribute keep of tag_input_b : signal is "true";
+
     signal ms_reg_input_mux_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_reg_input_mux_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of ms_reg_input_mux_a : signal is "true";
+    attribute keep of ms_reg_input_mux_b : signal is "true";
+
     signal ms_reg_out_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_reg_out_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    attribute keep of ms_reg_out_a : signal is "true";
+    attribute keep of ms_reg_out_b : signal is "true";
+
     signal ms_out_mux1_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal ms_out_mux1_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of ms_out_mux1_a : signal is "true";
+    attribute keep of ms_out_mux1_b : signal is "true";
+
     signal ms_out_mux2_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal ms_out_mux2_b: std_logic_vector(CCW_SIZE-1 downto 0);
-    
+    attribute keep of ms_out_mux2_a : signal is "true";
+    attribute keep of ms_out_mux2_b : signal is "true";
+
     signal data_out_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal data_out_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of data_out_mux_a : signal is "true";
+    attribute keep of data_out_mux_b : signal is "true";
+
     signal data_bdo_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal data_bdo_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of data_bdo_a : signal is "true";
+    attribute keep of data_bdo_b : signal is "true";
+
     signal tag_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal tag_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    attribute keep of tag_mux_a : signal is "true";
+    attribute keep of tag_mux_b : signal is "true";
     
 begin
-
+    DEBUG_COMB: if DEBUG = 1 generate
+        permout_comb <= permout_a xor permout_b;
+        perm_input_comb <= perm_input_a xor perm_input_b;
+        lfsr_current_comb <= lfsr_current_a xor lfsr_current_b;
+    end generate;
     PERM: entity work.elephant_perm_protected
         port map(
             clk => clk,
             load_lfsr => load_lfsr,
             en_lfsr => en_lfsr,
             input_a => perm_input_a,
-            input_b => perm_input_a,
+            input_b => perm_input_b,
             random => random,
             output_a => permout_a,
             output_b => permout_b
@@ -174,7 +256,7 @@ begin
     begin
         if rising_edge(clk) and tag_en = '1' then
             tag_out_a <= tag_input_a;
-            tag_out_b <= tag_input_a;
+            tag_out_b <= tag_input_b;
         end if;
     end process;
 
@@ -259,8 +341,8 @@ begin
     tag_input_b <= lfsr_xor_mux_b(TAG_SIZE_BITS-1 downto 0) xor tag_out_b when tag_reset = '0' else (others => '0');
 
     --Logic for ms_reg_mux and perm
-    ms_reg_input_mux_a <= permout_a when perm_en = '1' else lfsr_xor_mux_a;
-    ms_reg_input_mux_b <= permout_b when perm_en = '1' else lfsr_xor_mux_b;
+    ms_reg_input_mux_a <= permout_a when perm_sel = '1' else lfsr_xor_mux_a;
+    ms_reg_input_mux_b <= permout_b when perm_sel = '1' else lfsr_xor_mux_b;
     perm_input_a <= ms_reg_out_a;
     perm_input_b <= ms_reg_out_b;
 

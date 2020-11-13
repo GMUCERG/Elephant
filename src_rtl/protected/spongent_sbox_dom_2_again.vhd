@@ -34,8 +34,6 @@ entity spongent_sbox_dom_2_again is
 end spongent_sbox_dom_2_again;
 
 architecture behav of spongent_sbox_dom_2_again is
-    attribute keep_hierarchy : string;
-    attribute keep_hierarchy of behav : architecture is "true";
 
     signal s1_0xor1, s2_0xor1: std_logic;
     signal s1_0xor2, s2_0xor2: std_logic;
@@ -47,6 +45,9 @@ architecture behav of spongent_sbox_dom_2_again is
     signal s_0xor3_and_0xor1: std_logic_vector(1 downto 0);
     signal s_3and_0xor1_and_0xor2: std_logic_vector(1 downto 0); 
     signal s_3and_1xor2_and_0xor3: std_logic_vector(1 downto 0);
+
+    attribute keep_hierarchy : string;
+    attribute keep_hierarchy of behav : architecture is "true";
 
     attribute keep : string;
     attribute keep of s1_0xor1 : signal is "true";

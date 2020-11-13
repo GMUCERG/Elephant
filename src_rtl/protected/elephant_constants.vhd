@@ -38,4 +38,6 @@ package elephant_constants is
 
     constant RANDOM_BITS_PER_SBOX: integer := 9;
     constant NUMBER_SBOXS: integer := 40;
+
+    constant DEBUG: integer := 1;
 end package elephant_constants;
