@@ -405,7 +405,7 @@ begin
         if perm_cnt_int < (2*PERM_CYCLES) then
             perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
-            if perm_cnt_int mod 2 = 0 then
+            if perm_cnt_int mod 2 = 1 then
                 ms_en <= '1';
                 en_lfsr <= '1';
             end if;

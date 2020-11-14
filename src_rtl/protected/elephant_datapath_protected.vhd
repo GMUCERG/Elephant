@@ -298,11 +298,11 @@ begin
                        x"000001" & bdi_or_bdo_a(7 downto 0) when "01",
                        x"0001" & bdi_or_bdo_a(15 downto 0) when "10",
                        x"01" & bdi_or_bdo_a(23 downto 0) when others;
-    with bdi_size select
-        padding_bdi_b <= x"00000001" when "00",
-                       x"000001" & bdi_or_bdo_b(7 downto 0) when "01",
-                       x"0001" & bdi_or_bdo_b(15 downto 0) when "10",
-                       x"01" & bdi_or_bdo_b(23 downto 0) when others;
+--    with bdi_size select
+--        padding_bdi_b <= x"00000001" when "00",
+--                       x"000001" & bdi_or_bdo_b(7 downto 0) when "01",
+--                       x"0001" & bdi_or_bdo_b(15 downto 0) when "10",
+--                       x"01" & bdi_or_bdo_b(23 downto 0) when others;
 
     --Controls the next input into the load_data register
     with load_data_sel select
@@ -311,8 +311,9 @@ begin
                                padding_bdi_a  when others;
     with load_data_sel select
         load_data_input_mux_b <= x"00000000"  when "00",
-                               bdi_or_bdo_b   when "01",
-                               padding_bdi_b  when others;
+                                 bdi_or_bdo_b when others;
+--                               bdi_or_bdo_b   when "01",
+--                               padding_bdi_b  when others;
 
     --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
     --Would likely required this to happen after mux and => ms_reg would be zero prior
