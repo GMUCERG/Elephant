@@ -18,7 +18,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 use work.elephant_constants.all;
-use work.Design_pkg.all;
+use work.design_pkg.all;
 
 entity elephant_datapath_protected is
     port(
@@ -129,11 +129,13 @@ architecture behavioral of elephant_datapath_protected is
 
     signal padding_bdi_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal padding_bdi_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal padding_bdi_comb: std_logic_vector(CCW_SIZE-1 downto 0);
     attribute keep of padding_bdi_a : signal is "true";
     attribute keep of padding_bdi_b : signal is "true";
 
     signal load_data_input_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal load_data_input_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal load_data_input_mux_comb: std_logic_vector(CCW_SIZE-1 downto 0);
     attribute keep of load_data_input_mux_a : signal is "true";
     attribute keep of load_data_input_mux_b : signal is "true";
 
@@ -218,12 +220,14 @@ begin
         ms_out_mux1_comb <= ms_out_mux1_a xor ms_out_mux1_b;
         ms_reg_input_mux_comb <= ms_reg_input_mux_a xor ms_reg_input_mux_b;
         ms_reg_out_comb <= ms_reg_out_a xor ms_reg_out_b;
+        load_data_input_mux_comb <= load_data_input_mux_a xor load_data_input_mux_b;
         load_data_output_comb <= load_data_output_a xor load_data_output_b;
         npub_out_comb <= npub_out_a xor npub_out_b;
         tag_mux_comb <= tag_mux_a xor tag_mux_b;
         tag_out_comb <= tag_out_a xor tag_out_b;
         bdo_comb_t <= data_out_mux_a xor data_out_mux_b;
         bdo_comb <= reverse_byte(bdo_comb_t);
+        padding_bdi_comb <= padding_bdi_a xor padding_bdi_b;
     end generate;
     PERM: entity work.elephant_perm_protected
         port map(
@@ -305,11 +309,11 @@ begin
                        x"000001" & bdi_or_bdo_a(7 downto 0) when "01",
                        x"0001" & bdi_or_bdo_a(15 downto 0) when "10",
                        x"01" & bdi_or_bdo_a(23 downto 0) when others;
---    with bdi_size select
---        padding_bdi_b <= x"00000001" when "00",
---                       x"000001" & bdi_or_bdo_b(7 downto 0) when "01",
---                       x"0001" & bdi_or_bdo_b(15 downto 0) when "10",
---                       x"01" & bdi_or_bdo_b(23 downto 0) when others;
+    with bdi_size select
+        padding_bdi_b <= x"00000000" when "00",
+                       x"000000" & bdi_or_bdo_b(7 downto 0) when "01",
+                       x"0000" & bdi_or_bdo_b(15 downto 0) when "10",
+                       x"00" & bdi_or_bdo_b(23 downto 0) when others;
 
     --Controls the next input into the load_data register
     with load_data_sel select
@@ -318,9 +322,8 @@ begin
                                padding_bdi_a  when others;
     with load_data_sel select
         load_data_input_mux_b <= x"00000000"  when "00",
-                                 bdi_or_bdo_b when others;
---                               bdi_or_bdo_b   when "01",
---                               padding_bdi_b  when others;
+                                 bdi_or_bdo_b   when "01",
+                                 padding_bdi_b when others;
 
     --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
     --Would likely required this to happen after mux and => ms_reg would be zero prior
