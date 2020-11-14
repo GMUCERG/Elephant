@@ -139,6 +139,7 @@ architecture behavioral of elephant_datapath_protected is
 
     signal load_data_output_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal load_data_output_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal load_data_output_comb: std_logic_vector(STATE_SIZE-1 downto 0);
     attribute keep of load_data_output_a : signal is "true";
     attribute keep of load_data_output_b : signal is "true";
 
@@ -154,6 +155,7 @@ architecture behavioral of elephant_datapath_protected is
 
     signal npub_out_a: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
     signal npub_out_b: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
+    signal npub_out_comb: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
     attribute keep of npub_out_a : signal is "true";
     attribute keep of npub_out_b : signal is "true";
 
@@ -169,16 +171,19 @@ architecture behavioral of elephant_datapath_protected is
 
     signal ms_reg_input_mux_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_reg_input_mux_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_input_mux_comb: std_logic_vector(STATE_SIZE-1 downto 0);
     attribute keep of ms_reg_input_mux_a : signal is "true";
     attribute keep of ms_reg_input_mux_b : signal is "true";
 
     signal ms_reg_out_a: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_reg_out_b: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_out_comb: std_logic_vector(STATE_SIZE-1 downto 0);
     attribute keep of ms_reg_out_a : signal is "true";
     attribute keep of ms_reg_out_b : signal is "true";
 
     signal ms_out_mux1_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal ms_out_mux1_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal ms_out_mux1_comb: std_logic_vector(CCW_SIZE-1 downto 0);
     attribute keep of ms_out_mux1_a : signal is "true";
     attribute keep of ms_out_mux1_b : signal is "true";
 
@@ -207,6 +212,11 @@ begin
         permout_comb <= permout_a xor permout_b;
         perm_input_comb <= perm_input_a xor perm_input_b;
         lfsr_current_comb <= lfsr_current_a xor lfsr_current_b;
+        ms_out_mux1_comb <= ms_out_mux1_a xor ms_out_mux1_b;
+        ms_reg_input_mux_comb <= ms_reg_input_mux_a xor ms_reg_input_mux_b;
+        ms_reg_out_comb <= ms_reg_out_a xor ms_reg_out_b;
+        load_data_output_comb <= load_data_output_a xor load_data_output_b;
+        npub_out_comb <= npub_out_a xor npub_out_b;
     end generate;
     PERM: entity work.elephant_perm_protected
         port map(

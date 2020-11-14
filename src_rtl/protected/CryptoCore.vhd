@@ -133,7 +133,7 @@ begin
             key_a        => key_a,
             key_b        => key_bc,
             bdi_a        => bdi_a,
-            bdi_b        => bdi_b,
+            bdi_b        => bdi_bc,
             random       => prng_rdi_data(RANDOM_BITS_PER_SBOX*NUMBER_SBOXS - 1 downto 0),
             bdi_size => bdi_size_intern,
             data_type_sel => data_type_sel,
@@ -296,14 +296,14 @@ begin
             load_lfsr <= '1';
         end if;
     when PERM_KEY =>
-        if perm_cnt_int < PERM_CYCLES then
+        if perm_cnt_int < (2*PERM_CYCLES) then
             perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
             if perm_cnt_int mod 2 = 1 then
                 ms_en <= '1';
                 en_lfsr <= '1';
             end if;
-            if perm_cnt_int = PERM_CYCLES-1 then
+            if perm_cnt_int = (2*PERM_CYCLES)-1 then
                 --Save the perm key
                 key_en <= '1';
                 n_ctl_s <= AD_S;
@@ -402,14 +402,14 @@ begin
         end if;
             
     when PERM =>
-        if perm_cnt_int < PERM_CYCLES then
+        if perm_cnt_int < (2*PERM_CYCLES) then
             perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
             if perm_cnt_int mod 2 = 0 then
                 ms_en <= '1';
                 en_lfsr <= '1';
             end if;
-            if perm_cnt_int = PERM_CYCLES-1 then
+            if perm_cnt_int = (2*PERM_CYCLES)-1 then
                 n_ctl_s <= POST_PERM;
             end if;
         end if;
