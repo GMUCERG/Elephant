@@ -161,6 +161,7 @@ architecture behavioral of elephant_datapath_protected is
 
     signal tag_out_a: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     signal tag_out_b: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_out_comb: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     attribute keep of tag_out_a : signal is "true";
     attribute keep of tag_out_b : signal is "true";
 
@@ -204,9 +205,11 @@ architecture behavioral of elephant_datapath_protected is
 
     signal tag_mux_a: std_logic_vector(CCW_SIZE-1 downto 0);
     signal tag_mux_b: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal tag_mux_comb: std_logic_vector(CCW_SIZE-1 downto 0);
     attribute keep of tag_mux_a : signal is "true";
     attribute keep of tag_mux_b : signal is "true";
-    
+
+    signal bdo_comb, bdo_comb_t: std_logic_vector(CCW_SIZE-1 downto 0);
 begin
     DEBUG_COMB: if DEBUG = 1 generate
         permout_comb <= permout_a xor permout_b;
@@ -217,6 +220,10 @@ begin
         ms_reg_out_comb <= ms_reg_out_a xor ms_reg_out_b;
         load_data_output_comb <= load_data_output_a xor load_data_output_b;
         npub_out_comb <= npub_out_a xor npub_out_b;
+        tag_mux_comb <= tag_mux_a xor tag_mux_b;
+        tag_out_comb <= tag_out_a xor tag_out_b;
+        bdo_comb_t <= data_out_mux_a xor data_out_mux_b;
+        bdo_comb <= reverse_byte(bdo_comb_t);
     end generate;
     PERM: entity work.elephant_perm_protected
         port map(

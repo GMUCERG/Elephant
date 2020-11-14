@@ -536,15 +536,15 @@ begin
     when TAG_S =>
         bdo_sel <= '1';
         if decrypt_op /= '1' then
-            bdo_valid <= '1';
             bdo_valid_bytes <= (others => '1');
             bdo_type <= HDR_TAG;
             if bdo_ready = '1' then
+                bdo_valid <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
-            end if;
-            if data_cnt_int = ELE_TAG_SIZE-1 then
-                end_of_block <= '1';
-                n_ctl_s <= IDLE;
+                if data_cnt_int = ELE_TAG_SIZE-1 then
+                    end_of_block <= '1';
+                    n_ctl_s <= IDLE;
+                end if;
             end if;
         else
             if bdi_valid = '1' and msg_auth_ready = '1' then
