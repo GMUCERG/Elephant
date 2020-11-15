@@ -41,7 +41,6 @@ entity FOBOS_DUT is
 generic(       
     W : integer:=32; -- pdi and do width (mulltiple of 4)
     SW: integer:=32  -- sdi width (multiple of 4)
-    --RW: integer:=32 -- rdi width which will be supplied to LWC                                   
 );
 port(
 	clk : in std_logic;
@@ -452,33 +451,6 @@ rdi_ld_cntr: entity work.dut_regn(behavioral)
 next_rdi_ld_cnt <= (others => '0') when (ld_cnt_init = '1') else rdi_ld_cnt + 1;
 rdi_ld_cnt_full <= '1' when (rdi_ld_cnt = (W/4)-1) else '0';
 
---! Trivium-based PRNG
-
---rndnumgen: entity work.prng_trivium_enhanced(structural)
---     generic map(N => 1) -- number of Trivium instances, which provides 64 random bits per instance up to N = 4
---     port map(
---     clk => clk,
---     rst => rst,
---     en_prng => '1',
---     seed => rnd_reg,
---     reseed => rnd_init,
---     reseed_ack => open,
---     rdi_data => rdi_data,
---    rdi_valid => rdi_valid,
---     rdi_ready => '1' -- assumed that PRNG will provide random bits on every clock cycle in current version
---     );
---     
--- rseed write process
---
---process(clk)
---
---begin
---	if (rising_edge(clk)) then
---		if (rdi_fifo_buffer_en = '1') then
---			rnd_reg <= rnd_reg(RSEEDLEN - 4 - 1 downto 0) & din;
---		end if;
---	end if;
---end process;
 
 rdi_fifo : entity work.dut_fifo(structure)
     generic map(

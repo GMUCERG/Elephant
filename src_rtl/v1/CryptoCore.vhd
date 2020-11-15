@@ -189,13 +189,16 @@ begin
         end if;
     when STORE_KEY =>
         if data_cnt_int <= BLOCK_SIZE then
-            n_data_cnt_int <= data_cnt_int + 1;
-            if key_valid = '1' then
-                key_ready <= '1';
-                load_data_en <= '1';
-                data_type_sel <= '1'; --select key type
-                load_data_sel <= "01";
+            if data_cnt_int < KEY_SIZE then
+                if key_valid = '1' then
+                    n_data_cnt_int <= data_cnt_int + 1;
+                    key_ready <= '1';
+                    load_data_en <= '1';
+                    data_type_sel <= '1'; --select key type
+                    load_data_sel <= "01";
+                end if;
             else
+                n_data_cnt_int <= data_cnt_int + 1;
                 if data_cnt_int <= KEY_SIZE then
                     load_data_sel <= "00"; --zero pad
                     load_data_en <= '1';
@@ -274,6 +277,14 @@ begin
                         end if;
                     end if;
                 end if;
+                if lfsr_loaded /= '1' then
+                    datap_lfsr_en <= '1';
+                    if data_cnt_int < BLOCK_SIZE-1 then
+                        datap_lfsr_load <= '1';
+                    elsif data_cnt_int = BLOCK_SIZE then
+                        n_lfsr_loaded <= '1';
+                    end if;
+                end if;
             end if;
         else
             n_data_cnt_int <= data_cnt_int + 1;
@@ -290,15 +301,16 @@ begin
                 n_ctl_s <= PRE_PERM;
                 ms_en <= '1';
             end if;
-        end if;
-        if lfsr_loaded /= '1' then
-            datap_lfsr_en <= '1';
-            if data_cnt_int < BLOCK_SIZE-1 then
-                datap_lfsr_load <= '1';
-            elsif data_cnt_int = BLOCK_SIZE then
-                n_lfsr_loaded <= '1';
+            if lfsr_loaded /= '1' then
+                datap_lfsr_en <= '1';
+                if data_cnt_int < BLOCK_SIZE-1 then
+                    datap_lfsr_load <= '1';
+                elsif data_cnt_int = BLOCK_SIZE then
+                    n_lfsr_loaded <= '1';
+                end if;
             end if;
         end if;
+
     when PRE_PERM =>
         --This will handle the logic of XOR with different mask prior to perm
         n_ctl_s <= PERM;
@@ -445,15 +457,15 @@ begin
     when TAG_S =>
         bdo_sel <= '1';
         if decrypt_op /= '1' then
-            bdo_valid <= '1';
             bdo_valid_bytes <= (others => '1');
             bdo_type <= HDR_TAG;
             if bdo_ready = '1' then
+                bdo_valid <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
-            end if;
-            if data_cnt_int = ELE_TAG_SIZE-1 then
-                end_of_block <= '1';
-                n_ctl_s <= IDLE;
+                if data_cnt_int = ELE_TAG_SIZE-1 then
+                    end_of_block <= '1';
+                    n_ctl_s <= IDLE;
+                end if;
             end if;
         else
             if bdi_valid = '1' and msg_auth_ready = '1' then
