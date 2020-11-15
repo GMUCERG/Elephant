@@ -115,11 +115,9 @@ architecture behavioral of CryptoCore is
     signal seed : std_logic_vector(NUM_TRIVIUM_UNITS*128-1 downto 0);
     signal bdi_bc, key_bc : std_logic_vector(CCW-1 downto 0);
 
-    --signal first_blk, next_first_blk : std_logic;
-    --signal tag_valid, next_tag_valid : std_logic;
-    --signal bdi_eoi_r, next_bdi_eoi_r : std_logic;
-    --signal wrd_cnt, next_wrd_cnt : unsigned(5 - 1 downto 0);
-    
+    signal tag_comp_a, tag_comp_b, tag_comp_t : std_logic_vector(CCW-1 downto 0);
+    signal tag_mux_sel : std_logic;
+
 begin
     key_bc <= key_b xor key_c;
     bdi_bc <= bdi_b xor bdi_c;
@@ -127,6 +125,10 @@ begin
     bdo_a <= bdo_sa;
     bdo_b <= bdo_sb;
     bdo_c <= (others => '0');
+
+    tag_comp_a <= bdo_sa when tag_mux_sel = '1' else (others => '0');
+    tag_comp_b <= bdo_sb when tag_mux_sel = '1' else (others => '0');
+    tag_comp_t <= tag_comp_a xor tag_comp_b xor bdi_a xor bdi_bc;
 
     ELEPHANT_DATAP: entity work.elephant_datapath_protected
         port map(
@@ -229,6 +231,8 @@ begin
     reseed <= '0';
     rdi_ready <= '0';
     en_seed_sipo <= '0';
+
+    tag_mux_sel <= '0';
 
     case ctl_s is
     when RST_S =>
@@ -362,6 +366,14 @@ begin
                         end if;
                     end if;
                 end if;
+                if lfsr_loaded /= '1' then
+                    datap_lfsr_en <= '1';
+                    if data_cnt_int < BLOCK_SIZE-1 then
+                        datap_lfsr_load <= '1';
+                    elsif data_cnt_int = BLOCK_SIZE then
+                        n_lfsr_loaded <= '1';
+                    end if;
+                end if;
             end if;
         else
             n_data_cnt_int <= data_cnt_int + 1;
@@ -378,15 +390,16 @@ begin
                 n_ctl_s <= PRE_PERM;
                 ms_en <= '1';
             end if;
-        end if;
-        if lfsr_loaded /= '1' then
-            datap_lfsr_en <= '1';
-            if data_cnt_int < BLOCK_SIZE-1 then
-                datap_lfsr_load <= '1';
-            elsif data_cnt_int = BLOCK_SIZE then
-                n_lfsr_loaded <= '1';
+            if lfsr_loaded /= '1' then
+                datap_lfsr_en <= '1';
+                if data_cnt_int < BLOCK_SIZE-1 then
+                    datap_lfsr_load <= '1';
+                elsif data_cnt_int = BLOCK_SIZE then
+                    n_lfsr_loaded <= '1';
+                end if;
             end if;
         end if;
+
     when PRE_PERM =>
         --This will handle the logic of XOR with different mask prior to perm
         n_ctl_s <= PERM;
@@ -548,18 +561,19 @@ begin
             end if;
         else
             if bdi_valid = '1' and msg_auth_ready = '1' then
+                tag_mux_sel <= '1';
                 bdi_ready <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
-                    if (bdi_a /= bdo_sa) then
+                    if (tag_comp_t /= x"00000000") then
                         msg_auth <= '0';
                     else
                         msg_auth <= tag_verified;
                     end if;
                 else
-                    if bdi_a /= bdo_sa then
+                    if tag_comp_t /= x"00000000" then
                         n_tag_verified <= '0';
                     end if;
                 end if;
