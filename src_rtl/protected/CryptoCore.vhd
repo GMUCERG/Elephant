@@ -115,7 +115,7 @@ architecture behavioral of CryptoCore is
     signal seed : std_logic_vector(NUM_TRIVIUM_UNITS*128-1 downto 0);
     signal bdi_bc, key_bc : std_logic_vector(CCW-1 downto 0);
 
-    signal tag_comp_a, tag_comp_b, tag_comp_t : std_logic_vector(CCW-1 downto 0);
+    --signal tag_comp_a, tag_comp_b, tag_comp_t : std_logic_vector(CCW-1 downto 0);
     signal tag_mux_sel : std_logic;
 
 begin
@@ -126,9 +126,9 @@ begin
     bdo_b <= bdo_sb;
     bdo_c <= (others => '0');
 
-    tag_comp_a <= bdo_sa when tag_mux_sel = '1' else (others => '0');
-    tag_comp_b <= bdo_sb when tag_mux_sel = '1' else (others => '0');
-    tag_comp_t <= tag_comp_a xor tag_comp_b xor bdi_a xor bdi_bc;
+    --tag_comp_a <= bdo_sa when tag_mux_sel = '1' else (others => '0');
+    --tag_comp_b <= bdo_sb when tag_mux_sel = '1' else (others => '0');
+    --tag_comp_t <= tag_comp_a xor tag_comp_b xor bdi_a xor bdi_bc;
 
     ELEPHANT_DATAP: entity work.elephant_datapath_protected
         port map(
@@ -567,15 +567,16 @@ begin
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
-                    if (tag_comp_t /= x"00000000") then
-                        msg_auth <= '0';
-                    else
+                    --if (tag_comp_t /= x"00000000") then
+                    --    msg_auth <= '0';
+                    --else
                         msg_auth <= tag_verified;
-                    end if;
+                    --end if;
                 else
-                    if tag_comp_t /= x"00000000" then
-                        n_tag_verified <= '0';
-                    end if;
+                    --if tag_comp_t /= x"00000000" then
+                    --    n_tag_verified <= '0';
+                    n_tag_verified <= '1';
+                    --end if;
                 end if;
             end if;
         end if;
