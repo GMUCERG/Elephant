@@ -212,7 +212,6 @@ begin
                 bdi_a           => bdi_cipher_in_a                         ,
                 bdi_b           => bdi_cipher_in_b                         ,
                 bdi_c           => bdi_cipher_in_c                         ,
-				rdi_data		=> rdi_data                                ,
                 bdi_valid       => bdi_valid_cipher_in                     ,
                 bdi_ready       => bdi_ready_cipher_in                     ,
                 bdi_pad_loc     => bdi_pad_loc_cipher_in                   ,
@@ -234,7 +233,10 @@ begin
                 end_of_block    => end_of_block_cipher_out                 ,
                 msg_auth_valid  => msg_auth_valid                          ,
                 msg_auth_ready  => msg_auth_ready                          ,
-                msg_auth        => msg_auth
+                msg_auth        => msg_auth                                ,
+                rdi_data        => rdi_data                                ,
+                rdi_valid       => rdi_valid                               ,
+                rdi_ready       => rdi_ready
             );
     Inst_PostProcessor: entity work.PostProcessor(PostProcessor)
         PORT MAP(

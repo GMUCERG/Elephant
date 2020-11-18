@@ -22,43 +22,53 @@ use work.Design_pkg.all;
 use work.elephant_constants.all;
 
 entity CryptoCore is
-    Port (
-        clk             : in   STD_LOGIC;
-        rst             : in   STD_LOGIC;
+    port (
+        clk                 : in   std_logic;
+        rst                 : in   std_logic;
         --PreProcessor===============================================
         ----!key----------------------------------------------------
-        key             : in   STD_LOGIC_VECTOR (CCSW     -1 downto 0);
-        key_valid       : in   STD_LOGIC;
-        key_ready       : out  STD_LOGIC;
+        key_a               : in   std_logic_vector (CCSW    -1 downto 0);
+        key_b               : in   std_logic_vector (CCSW    -1 downto 0);
+        key_c               : in   std_logic_vector (CCSW    -1 downto 0);
+        key_valid           : in   std_logic;
+        key_update          : in   std_logic;
+        key_ready           : out  std_logic;
         ----!Data----------------------------------------------------
-        bdi             : in   STD_LOGIC_VECTOR (CCW     -1 downto 0);
-        bdi_valid       : in   STD_LOGIC;
-        bdi_ready       : out  STD_LOGIC;
-        bdi_pad_loc     : in   STD_LOGIC_VECTOR (CCWdiv8 -1 downto 0);
-        bdi_valid_bytes : in   STD_LOGIC_VECTOR (CCWdiv8 -1 downto 0);
-        bdi_size        : in   STD_LOGIC_VECTOR (3       -1 downto 0);
-        bdi_eot         : in   STD_LOGIC;
-        bdi_eoi         : in   STD_LOGIC;
-        bdi_type        : in   STD_LOGIC_VECTOR (4       -1 downto 0);
-        decrypt_in      : in   STD_LOGIC;
-        key_update      : in   STD_LOGIC;
-        hash_in         : in   std_logic;
+        bdi_a               : in   std_logic_vector (CCW     -1 downto 0);
+        bdi_b               : in   std_logic_vector (CCW     -1 downto 0);
+        bdi_c               : in   std_logic_vector (CCW     -1 downto 0);
+        bdi_valid           : in   std_logic;
+        bdi_ready           : out  std_logic;
+        bdi_pad_loc         : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_valid_bytes     : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_size            : in   std_logic_vector (3       -1 downto 0);
+        bdi_eot             : in   std_logic;
+        bdi_eoi             : in   std_logic;
+        bdi_type            : in   std_logic_vector (4       -1 downto 0);
+        decrypt_in          : in   std_logic;
+        hash_in             : in   std_logic;
         --!Post Processor=========================================
-        bdo             : out  STD_LOGIC_VECTOR (CCW      -1 downto 0);
-        bdo_valid       : out  STD_LOGIC;
-        bdo_ready       : in   STD_LOGIC;
-        bdo_type        : out  STD_LOGIC_VECTOR (4       -1 downto 0);
-        bdo_valid_bytes : out  STD_LOGIC_VECTOR (CCWdiv8 -1 downto 0);
-        end_of_block    : out  STD_LOGIC;
-        msg_auth_valid  : out  STD_LOGIC;
-        msg_auth_ready  : in   STD_LOGIC;
-        msg_auth        : out  STD_LOGIC
+        bdo_a               : out  std_logic_vector (CCW     -1 downto 0);
+        bdo_b               : out  std_logic_vector (CCW     -1 downto 0);
+        bdo_c               : out  std_logic_vector (CCW     -1 downto 0);
+        bdo_valid           : out  std_logic;
+        bdo_ready           : in   std_logic;
+        bdo_type            : out  std_logic_vector (4       -1 downto 0);
+        bdo_valid_bytes     : out  std_logic_vector (CCWdiv8 -1 downto 0);
+        end_of_block        : out  std_logic;
+        msg_auth_valid      : out  std_logic;
+        msg_auth_ready      : in   std_logic;
+        msg_auth            : out  std_logic;
+        --rdi data to seed PRNG
+        rdi_valid           : in   std_logic;
+        rdi_ready           : out  std_logic; 
+        rdi_data            : in   std_logic_vector(RW-1 downto 0)
     );
 end CryptoCore;
 
 architecture behavioral of CryptoCore is
     --internal signals for datapath
-    signal bdo_s: std_logic_vector(CCW - 1 downto 0);
+    signal bdo_sa, bdo_sb, bdo_sc: std_logic_vector(CCW - 1 downto 0);
     signal bdo_sel: std_logic;
     signal saving_bdo: std_logic;
     signal bdi_size_intern: std_logic_vector(1 downto 0);
@@ -75,8 +85,8 @@ architecture behavioral of CryptoCore is
     signal ms_en: std_logic;
     
     --Signals for permutation
-    signal load_lfsr:std_logic;
-    signal perm_en: std_logic;
+    signal load_lfsr, en_lfsr:std_logic;
+    signal perm_sel: std_logic;
     
     --Signals for datapath lsfr
     signal datap_lfsr_load: std_logic;
@@ -88,20 +98,45 @@ architecture behavioral of CryptoCore is
 --    signal reset_perm_cnt: std_logic;
     signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
     
-    type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
-                       PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S, MDATA_NPUB, TAG_S);
+    type ctl_state is (RST_S, LOAD_SEED, START_PRNG, WAIT_PRNG,
+                       IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
+                       PRE_PERM, PERM, POST_PERM, AD_S, MDATA_S,
+                       MDATA_NPUB, TAG_S);
     signal n_ctl_s, ctl_s, n_calling_state, calling_state: ctl_state;
     signal lfsr_loaded, n_lfsr_loaded: std_logic;
     signal done_state, n_done_state: std_logic;
     signal append_one, n_append_one: std_logic;
     signal decrypt_op, n_decrypt_op: std_logic;
     signal n_tag_verified, tag_verified :std_logic;
-    
+
+    signal en_seed_sipo : std_logic;
+    signal reseed, prng_rdi_valid: std_logic;
+    signal prng_rdi_data : std_logic_vector(NUM_TRIVIUM_UNITS*64-1 downto 0);
+    signal seed : std_logic_vector(NUM_TRIVIUM_UNITS*128-1 downto 0);
+    signal bdi_bc, key_bc : std_logic_vector(CCW-1 downto 0);
+
+    signal tag_comp_a, tag_comp_b, tag_comp_t : std_logic_vector(CCW-1 downto 0);
+    signal tag_mux_sel : std_logic;
+
 begin
-    ELEPHANT_DATAP: entity work.elephant_datapath
+    key_bc <= key_b xor key_c;
+    bdi_bc <= bdi_b xor bdi_c;
+
+    bdo_a <= bdo_sa;
+    bdo_b <= bdo_sb;
+    bdo_c <= (others => '0');
+
+    tag_comp_a <= bdo_sa when tag_mux_sel = '1' else (others => '0');
+    tag_comp_b <= bdo_sb when tag_mux_sel = '1' else (others => '0');
+    tag_comp_t <= tag_comp_a xor tag_comp_b xor bdi_a xor bdi_bc;
+
+    ELEPHANT_DATAP: entity work.elephant_datapath_protected
         port map(
-            key        => key,
-            bdi        => bdi,
+            key_a        => key_a,
+            key_b        => key_bc,
+            bdi_a        => bdi_a,
+            bdi_b        => bdi_bc,
+            random       => prng_rdi_data(RANDOM_BITS_PER_SBOX*NUMBER_SBOXS - 1 downto 0),
             bdi_size => bdi_size_intern,
             data_type_sel => data_type_sel,
             
@@ -114,21 +149,43 @@ begin
             tag_reset => tag_reset,
             ms_en => ms_en,
 
-            perm_en => perm_en,            
+            perm_sel => perm_sel,
             load_lfsr  => load_lfsr,
+            en_lfsr    => en_lfsr,
             
             datap_lfsr_load => datap_lfsr_load,
             datap_lfsr_en => datap_lfsr_en,
             
-            bdo => bdo_s,
+            bdo_a => bdo_sa,
+            bdo_b => bdo_sb,
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
             data_count => data_cnt_int,
-            perm_count => perm_cnt_int,
             clk        => clk
         );
+    trivium_inst : entity work.prng_trivium_enhanced(structural)
+    generic map (N => NUM_TRIVIUM_UNITS)
+    port map(
+        clk => clk,
+        rst => rst,
+        en_prng => '1',
+        seed => seed,
+        reseed => reseed,
+        reseed_ack => open,
+        rdi_data => prng_rdi_data,
+        rdi_ready => '1',
+        rdi_valid => prng_rdi_valid
+    );
 
-    
+    seed_sipo : process(clk)
+    begin
+        if rising_edge(clk) then
+            if en_seed_sipo = '1' then
+                seed <= seed(SEED_SIZE - RW -1 downto 0) & rdi_data;
+            end if;
+        end if;
+    end process;
+
 state_control: process(all)
 begin
     bdo_valid <= '0';
@@ -143,7 +200,6 @@ begin
     key_ready <= '0';
     bdi_ready <= '0';
     bdi_size_intern <= bdi_size(1 downto 0);
-    bdo <= bdo_s;
     data_type_sel <= '0';
 
     load_data_en <= '0';
@@ -156,7 +212,8 @@ begin
     ms_en <= '0';    
 
     load_lfsr <= '0';
-    perm_en <= '0';
+    en_lfsr <= '0';
+    perm_sel <= '0';
     datap_lfsr_load <= '0';
     datap_lfsr_en <= '0';
     
@@ -170,9 +227,38 @@ begin
     n_tag_verified <= tag_verified;
     n_perm_cnt_int <= 0;
     n_data_cnt_int <= data_cnt_int;
-    
+
+    reseed <= '0';
+    rdi_ready <= '0';
+    en_seed_sipo <= '0';
+
+    tag_mux_sel <= '0';
 
     case ctl_s is
+    when RST_S =>
+        n_ctl_s <= LOAD_SEED;
+    when LOAD_SEED =>
+        rdi_ready <= '1';
+        if rdi_valid = '1' then
+            en_seed_sipo <= '1';
+            if data_cnt_int = SEED_SIZE / RW -1 then
+                n_ctl_s <= START_PRNG;
+            else
+                n_ctl_s <= LOAD_SEED;
+            end if;
+            n_data_cnt_int <= data_cnt_int + 1;
+        else
+            n_ctl_s <= START_PRNG;
+        end if;
+    when START_PRNG =>
+        reseed <= '1';
+        n_ctl_s <= WAIT_PRNG;
+    when WAIT_PRNG =>
+        if prng_rdi_valid = '1' then
+            n_ctl_s <= IDLE;
+        else
+            n_ctl_s <= WAIT_PRNG;
+        end if;
     when IDLE =>
         n_lfsr_loaded <= '0';
         n_tag_verified <= '1';
@@ -214,11 +300,14 @@ begin
             load_lfsr <= '1';
         end if;
     when PERM_KEY =>
-        if perm_cnt_int < PERM_CYCLES then
-            perm_en <= '1';
+        if perm_cnt_int < (2*PERM_CYCLES) then
+            perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
-            ms_en <= '1';
-            if perm_cnt_int = PERM_CYCLES-1 then
+            if perm_cnt_int mod 2 = 1 then
+                ms_en <= '1';
+                en_lfsr <= '1';
+            end if;
+            if perm_cnt_int = (2*PERM_CYCLES)-1 then
                 --Save the perm key
                 key_en <= '1';
                 n_ctl_s <= AD_S;
@@ -326,11 +415,14 @@ begin
         end if;
             
     when PERM =>
-        if perm_cnt_int < PERM_CYCLES then
-            perm_en <= '1';
+        if perm_cnt_int < (2*PERM_CYCLES) then
+            perm_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;
-            ms_en <= '1';
-            if perm_cnt_int = PERM_CYCLES-1 then
+            if perm_cnt_int mod 2 = 1 then
+                ms_en <= '1';
+                en_lfsr <= '1';
+            end if;
+            if perm_cnt_int = (2*PERM_CYCLES)-1 then
                 n_ctl_s <= POST_PERM;
             end if;
         end if;
@@ -469,18 +561,19 @@ begin
             end if;
         else
             if bdi_valid = '1' and msg_auth_ready = '1' then
+                tag_mux_sel <= '1';
                 bdi_ready <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
-                    if (bdi /= bdo_s) then
+                    if (tag_comp_t /= x"00000000") then
                         msg_auth <= '0';
                     else
                         msg_auth <= tag_verified;
                     end if;
                 else
-                    if bdi /= bdo_s then
+                    if tag_comp_t /= x"00000000" then
                         n_tag_verified <= '0';
                     end if;
                 end if;
@@ -495,7 +588,7 @@ begin
         perm_cnt_int <= n_perm_cnt_int;
         data_cnt_int <= n_data_cnt_int;
         if rst = '1' then
-            ctl_s <= IDLE;
+            ctl_s <= RST_S;
             calling_state <= IDLE;
             lfsr_loaded <= '0';
             done_state <= '0';

@@ -35,6 +35,9 @@ package elephant_constants is
     constant PERM_ROUNDS_PER_CYCLE: integer := 1;
     constant PERM_CYCLES: integer := 80/PERM_ROUNDS_PER_CYCLE;
     constant PERM_CYCLES_BITS: integer := 7;
-    --16 ~2500 LUTs
-    --8  ~1800 LUTs ROM
+
+    constant RANDOM_BITS_PER_SBOX: integer := 9;
+    constant NUMBER_SBOXS: integer := 40;
+
+    constant DEBUG: integer := 0;
 end package elephant_constants;
