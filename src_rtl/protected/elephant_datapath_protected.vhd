@@ -54,7 +54,7 @@ entity elephant_datapath_protected is
         bdo_b: out std_logic_vector(CCW_SIZE-1 downto 0);
         bdo_sel: in std_logic;
         saving_bdo: in std_logic;
-        data_count: in integer range 0 to BLOCK_SIZE + 1;
+        data_count: in std_logic_vector(2 downto 0);
         clk: in std_logic
     );
 end elephant_datapath_protected;
@@ -368,16 +368,16 @@ begin
     perm_input_b <= ms_reg_out_b;
 
     with data_count select
-        ms_out_mux2_a <= ms_reg_out_a(CCW-1 downto 0) when 0,
-                         ms_reg_out_a((2*CCW)-1 downto CCW) when 1,
-                         ms_reg_out_a((3*CCW)-1 downto 2*CCW) when 2,
-                         ms_reg_out_a((4*CCW)-1 downto 3*CCW) when 3,
+        ms_out_mux2_a <= ms_reg_out_a(CCW-1 downto 0) when "000",
+                         ms_reg_out_a((2*CCW)-1 downto CCW) when "001",
+                         ms_reg_out_a((3*CCW)-1 downto 2*CCW) when "010",
+                         ms_reg_out_a((4*CCW)-1 downto 3*CCW) when "011",
                          ms_reg_out_a((5*CCW)-1 downto 4*CCW) when others;
     with data_count select
-        ms_out_mux2_b <= ms_reg_out_b(CCW-1 downto 0) when 0,
-                         ms_reg_out_b((2*CCW)-1 downto CCW) when 1,
-                         ms_reg_out_b((3*CCW)-1 downto 2*CCW) when 2,
-                         ms_reg_out_b((4*CCW)-1 downto 3*CCW) when 3,
+        ms_out_mux2_b <= ms_reg_out_b(CCW-1 downto 0) when "000",
+                         ms_reg_out_b((2*CCW)-1 downto CCW) when "001",
+                         ms_reg_out_b((3*CCW)-1 downto 2*CCW) when "010",
+                         ms_reg_out_b((4*CCW)-1 downto 3*CCW) when "011",
                          ms_reg_out_b((5*CCW)-1 downto 4*CCW) when others;
 
     data_bdo_a <= bdi_or_key_rev_a xor ms_out_mux2_a;
@@ -385,8 +385,8 @@ begin
     bdo_a <= reverse_byte(data_out_mux_a);
     bdo_b <= reverse_byte(data_out_mux_b);
 
-    tag_mux_a <= tag_out_a(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out_a(31 downto 0);
-    tag_mux_b <= tag_out_b(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out_b(31 downto 0);
+    tag_mux_a <= tag_out_a(TAG_SIZE_BITS-1 downto 32) when data_count = "001" else tag_out_a(31 downto 0);
+    tag_mux_b <= tag_out_b(TAG_SIZE_BITS-1 downto 32) when data_count = "001" else tag_out_b(31 downto 0);
 
     data_out_mux_a <= data_bdo_a when bdo_sel ='0' else tag_mux_a;
     data_out_mux_b <= data_bdo_b when bdo_sel ='0' else tag_mux_b;

@@ -93,7 +93,7 @@ architecture behavioral of CryptoCore is
     signal datap_lfsr_en: std_logic;
     
     --Signals for data counter
-    signal n_data_cnt_int, data_cnt_int :integer range 0 to BLOCK_SIZE+1;
+    signal n_data_cnt_int, data_cnt_int : unsigned(2 downto 0);
     
 --    signal reset_perm_cnt: std_logic;
     signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
@@ -122,9 +122,12 @@ begin
     key_bc <= key_b xor key_c;
     bdi_bc <= bdi_b xor bdi_c;
 
+    -- bdo shared cannot be sent back to back to the output since the two
+    -- shares go through the same output PISO. This leaks the hamming distance
+    -- of bdo
     bdo_a <= bdo_sa;
-    bdo_b <= bdo_sb;
-    bdo_c <= (others => '0');
+    bdo_b <= (others => '0');
+    bdo_c <= bdo_sb;
 
     --tag_comp_a <= bdo_sa when tag_mux_sel = '1' else (others => '0');
     --tag_comp_b <= bdo_sb when tag_mux_sel = '1' else (others => '0');
@@ -160,7 +163,7 @@ begin
             bdo_b => bdo_sb,
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
-            data_count => data_cnt_int,
+            data_count => std_logic_vector(data_cnt_int),
             clk        => clk
         );
     trivium_inst : entity work.prng_trivium_enhanced(structural)
@@ -264,7 +267,7 @@ begin
         n_tag_verified <= '1';
         tag_reset <= '1';
         tag_en <= '1';
-        n_data_cnt_int <= 0;
+        n_data_cnt_int <= "000";
         n_done_state <= '0';
         if bdi_valid = '1' or key_valid = '1' then
             if key_update = '1' then
@@ -294,7 +297,7 @@ begin
             end if;
         else
             n_ctl_s <= PERM_KEY;
-            n_data_cnt_int <= 0;
+            n_data_cnt_int <= "000";
             load_data_en <= '1'; -- clear input data reg
             load_data_sel <= "11";
             load_lfsr <= '1';
@@ -405,7 +408,7 @@ begin
         n_ctl_s <= PERM;
         ms_en <= '1';
         load_lfsr <= '1'; --Resets counter and lfsr
-        n_data_cnt_int <= 0;
+        n_data_cnt_int <= "000";
         if calling_state = AD_S then
             lfsr_mux_sel <= "10";
         elsif calling_state = MDATA_NPUB then
