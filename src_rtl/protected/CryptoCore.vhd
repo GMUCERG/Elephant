@@ -93,7 +93,7 @@ architecture behavioral of CryptoCore is
     signal datap_lfsr_en: std_logic;
     
     --Signals for data counter
-    signal n_data_cnt_int, data_cnt_int : unsigned(2 downto 0);
+    signal n_data_cnt_int, data_cnt_int : unsigned(4 downto 0);
     
 --    signal reset_perm_cnt: std_logic;
     signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
@@ -163,7 +163,7 @@ begin
             bdo_b => bdo_sb,
             bdo_sel => bdo_sel,
             saving_bdo => saving_bdo,
-            data_count => std_logic_vector(data_cnt_int),
+            data_count => std_logic_vector(data_cnt_int(2 downto 0)),
             clk        => clk
         );
     trivium_inst : entity work.prng_trivium_enhanced(structural)
@@ -244,7 +244,7 @@ begin
         rdi_ready <= '1';
         if rdi_valid = '1' then
             en_seed_sipo <= '1';
-            if data_cnt_int = SEED_SIZE / RW -1 then
+            if data_cnt_int = to_unsigned((SEED_SIZE / RW) -1, 5) then
                 n_ctl_s <= START_PRNG;
             else
                 n_ctl_s <= LOAD_SEED;
@@ -267,7 +267,7 @@ begin
         n_tag_verified <= '1';
         tag_reset <= '1';
         tag_en <= '1';
-        n_data_cnt_int <= "000";
+        n_data_cnt_int <= "00000";
         n_done_state <= '0';
         if bdi_valid = '1' or key_valid = '1' then
             if key_update = '1' then
@@ -277,8 +277,8 @@ begin
             end if;
         end if;
     when STORE_KEY =>
-        if data_cnt_int <= BLOCK_SIZE then
-            if data_cnt_int < KEY_SIZE then
+        if data_cnt_int <= to_unsigned(BLOCK_SIZE,5) then
+            if data_cnt_int < to_unsigned(KEY_SIZE,5) then
                 if key_valid = '1' then
                     n_data_cnt_int <= data_cnt_int + 1;
                     key_ready <= '1';
@@ -288,7 +288,7 @@ begin
                 end if;
             else
                 n_data_cnt_int <= data_cnt_int + 1;
-                if data_cnt_int <= KEY_SIZE then
+                if data_cnt_int <= to_unsigned(KEY_SIZE,5) then
                     load_data_sel <= "00"; --zero pad
                     load_data_en <= '1';
                 else
@@ -297,7 +297,7 @@ begin
             end if;
         else
             n_ctl_s <= PERM_KEY;
-            n_data_cnt_int <= "000";
+            n_data_cnt_int <= "00000";
             load_data_en <= '1'; -- clear input data reg
             load_data_sel <= "11";
             load_lfsr <= '1';
@@ -317,7 +317,7 @@ begin
             end if;
         end if;
         --Obtain NPUB
-        if data_cnt_int < ELE_NPUB_SIZE then
+        if data_cnt_int < to_unsigned(ELE_NPUB_SIZE,5) then
             if bdi_valid = '1' then
                 n_decrypt_op <= decrypt_in;
                 bdi_ready <= '1';
@@ -326,12 +326,12 @@ begin
                 load_data_sel <= "01";
             end if;
         --Store npub and then shift it all the way to beginning of the register
-        elsif data_cnt_int = ELE_NPUB_SIZE then
+        elsif data_cnt_int = to_unsigned(ELE_NPUB_SIZE,5) then
             npub_en <= '1';
         end if;
     when LOAD_KEY =>
         --Obtain NPUB
-        if data_cnt_int < ELE_NPUB_SIZE then
+        if data_cnt_int < to_unsigned(ELE_NPUB_SIZE,5) then
             if bdi_valid = '1' then
                 n_data_cnt_int <= data_cnt_int + 1;
                 n_decrypt_op <= decrypt_in;
@@ -340,17 +340,17 @@ begin
                 load_data_sel <= "01";
             end if;
         --Store npub and then shift it all the way to beginning of the register
-        elsif data_cnt_int = ELE_NPUB_SIZE then
+        elsif data_cnt_int = to_unsigned(ELE_NPUB_SIZE,5) then
             npub_en <= '1';
             n_ctl_s <= AD_S;
         end if;
     when AD_S =>
         n_calling_state <= AD_S;
         if bdi_type = HDR_AD and done_state /= '1'
-            and data_cnt_int < BLOCK_SIZE and append_one /= '1' then
+            and data_cnt_int < to_unsigned(BLOCK_SIZE,5) and append_one /= '1' then
 
             if bdi_valid = '1' then
-                if data_cnt_int < BLOCK_SIZE then
+                if data_cnt_int < to_unsigned(BLOCK_SIZE,5) then
                     bdi_ready <= '1';
                     n_data_cnt_int <= data_cnt_int + 1;
                     load_data_en <= '1';
@@ -361,7 +361,7 @@ begin
                     end if;
                     --Need to signal to send the tag
                     if bdi_eot = '1' then
-                        if (data_cnt_int = BLOCK_SIZE-1 and bdi_valid_bytes = "1111") = False then
+                        if (data_cnt_int = to_unsigned(BLOCK_SIZE-1,5) and bdi_valid_bytes = "1111") = False then
                             n_done_state <= '1';
                         end if;
                         if bdi_valid_bytes = "1111" then
@@ -371,9 +371,9 @@ begin
                 end if;
                 if lfsr_loaded /= '1' then
                     datap_lfsr_en <= '1';
-                    if data_cnt_int < BLOCK_SIZE-1 then
+                    if data_cnt_int < to_unsigned(BLOCK_SIZE-1,5) then
                         datap_lfsr_load <= '1';
-                    elsif data_cnt_int = BLOCK_SIZE then
+                    elsif data_cnt_int = to_unsigned(BLOCK_SIZE,5) then
                         n_lfsr_loaded <= '1';
                     end if;
                 end if;
@@ -381,7 +381,7 @@ begin
         else
             n_data_cnt_int <= data_cnt_int + 1;
             load_data_en <= '1';
-            if (append_one = '1' or done_state = '0') and data_cnt_int /= BLOCK_SIZE then
+            if (append_one = '1' or done_state = '0') and data_cnt_int /= to_unsigned(BLOCK_SIZE,5) then
                 load_data_sel <= "10";
                 bdi_size_intern <= "00";
                 n_append_one <= '0';
@@ -389,15 +389,15 @@ begin
             else
                 load_data_sel <= "00"; --Zero pad
             end if;
-            if data_cnt_int = BLOCK_SIZE then
+            if data_cnt_int = to_unsigned(BLOCK_SIZE,5) then
                 n_ctl_s <= PRE_PERM;
                 ms_en <= '1';
             end if;
             if lfsr_loaded /= '1' then
                 datap_lfsr_en <= '1';
-                if data_cnt_int < BLOCK_SIZE-1 then
+                if data_cnt_int < to_unsigned(BLOCK_SIZE-1,5) then
                     datap_lfsr_load <= '1';
-                elsif data_cnt_int = BLOCK_SIZE then
+                elsif data_cnt_int = to_unsigned(BLOCK_SIZE,5) then
                     n_lfsr_loaded <= '1';
                 end if;
             end if;
@@ -408,7 +408,7 @@ begin
         n_ctl_s <= PERM;
         ms_en <= '1';
         load_lfsr <= '1'; --Resets counter and lfsr
-        n_data_cnt_int <= "000";
+        n_data_cnt_int <= "00000";
         if calling_state = AD_S then
             lfsr_mux_sel <= "10";
         elsif calling_state = MDATA_NPUB then
@@ -492,9 +492,9 @@ begin
         if done_state = '1' then
             n_data_cnt_int <= data_cnt_int + 1;
             datap_lfsr_en <= '1';
-            if data_cnt_int = 0 then
+            if data_cnt_int = to_unsigned(0,5) then
                 datap_lfsr_load <= '1';
-            elsif data_cnt_int = 1 then
+            elsif data_cnt_int = to_unsigned(1,5) then
                 n_done_state <= '0'; --Switching to processing messages
             end if;
         else
@@ -503,10 +503,10 @@ begin
         end if;
     when MDATA_S =>
         if (bdi_type = HDR_MSG or bdi_type = HDR_CT  or bdi_type = "0000") and 
-            done_state /= '1' and data_cnt_int < BLOCK_SIZE and append_one /= '1' then
+            done_state /= '1' and data_cnt_int < to_unsigned(BLOCK_SIZE,5) and append_one /= '1' then
 
             if bdi_valid = '1' and bdo_ready = '1' then
-                if data_cnt_int < BLOCK_SIZE then
+                if data_cnt_int < to_unsigned(BLOCK_SIZE,5) then
                     bdi_ready <= '1';
                     bdo_valid_bytes <= bdi_valid_bytes;
                     bdo_valid <= '1';
@@ -534,7 +534,7 @@ begin
             end if;
         else
             n_data_cnt_int <= data_cnt_int + 1;
-            if append_one = '1' and data_cnt_int /= BLOCK_SIZE then
+            if append_one = '1' and data_cnt_int /= to_unsigned(BLOCK_SIZE,5) then
                 load_data_sel <= "10";
                 bdi_size_intern <= "00";
                 n_append_one <= '0';
@@ -543,7 +543,7 @@ begin
                 load_data_sel <= "00"; --Zero pad
             end if;
             load_data_en <= '1';
-            if data_cnt_int = BLOCK_SIZE then
+            if data_cnt_int = to_unsigned(BLOCK_SIZE,5) then
                 n_calling_state <= MDATA_S;
                 n_ctl_s <= PRE_PERM;
                 ms_en <= '1';
@@ -557,7 +557,7 @@ begin
             if bdo_ready = '1' then
                 bdo_valid <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
-                if data_cnt_int = ELE_TAG_SIZE-1 then
+                if data_cnt_int = to_unsigned(ELE_TAG_SIZE-1,5) then
                     end_of_block <= '1';
                     n_ctl_s <= IDLE;
                 end if;
@@ -567,7 +567,7 @@ begin
                 tag_mux_sel <= '1';
                 bdi_ready <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
-                if data_cnt_int = ELE_TAG_SIZE-1 then
+                if data_cnt_int = to_unsigned(ELE_TAG_SIZE-1,5) then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
                     --if (tag_comp_t /= x"00000000") then
@@ -589,8 +589,6 @@ end process;
 p_reg: process(clk)
 begin
     if rising_edge(clk) then
-        perm_cnt_int <= n_perm_cnt_int;
-        data_cnt_int <= n_data_cnt_int;
         if rst = '1' then
             ctl_s <= RST_S;
             calling_state <= IDLE;
@@ -599,6 +597,8 @@ begin
             decrypt_op <= '0';
             tag_verified <= '0';
             append_one <= '0';
+            perm_cnt_int <= 0;
+            data_cnt_int <= "00000";
         else
             ctl_s <= n_ctl_s;
             calling_state <= n_calling_state;
@@ -607,6 +607,8 @@ begin
             decrypt_op <= n_decrypt_op;
             tag_verified <= n_tag_verified;
             append_one <= n_append_one;
+            perm_cnt_int <= n_perm_cnt_int;
+            data_cnt_int <= n_data_cnt_int;
         end if;
     end if;
 end process;
