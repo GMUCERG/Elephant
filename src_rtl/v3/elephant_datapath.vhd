@@ -47,7 +47,7 @@ entity elephant_datapath is
         datap_lfsr_en: in std_logic;
         
         bdo: out std_logic_vector(CCW_SIZE-1 downto 0);
-        bdo_sel: in std_logic;
+        bdo_sel: in std_logic_vector(1 downto 0);
         saving_bdo: in std_logic;
         data_count: in integer range 0 to BLOCK_SIZE+1; --std_logic_vector(2 downto 0);
         perm_count: in integer range 0 to PERM_CYCLES;
@@ -58,7 +58,6 @@ end elephant_datapath;
 architecture behavioral of elephant_datapath is
     
     signal permout: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal perm_input: std_logic_vector(STATE_SIZE-1 downto 0);
     
     signal datap_lfsr_out: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_current: std_logic_vector(STATE_SIZE-1 downto 0);
@@ -89,15 +88,14 @@ architecture behavioral of elephant_datapath is
 --    signal ms_out_mux1: std_logic_vector(CCW_SIZE-1 downto 0);
 --    signal ms_out_mux2: std_logic_vector(CCW_SIZE-1 downto 0);
     
-    signal data_out_mux: std_logic_vector(CCW_SIZE-1 downto 0);
     signal data_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal tag_mux: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_out: std_logic_vector(CCW_SIZE-1 downto 0);
     
 begin
 
     PERM: entity work.elephant_perm
         port map(
-            input => perm_input,
+            input => ms_reg_out,
             clk => clk,
             perm_count => perm_count,
             load_lfsr => load_lfsr,
@@ -179,7 +177,6 @@ begin
                         prev_next_ms_xor when "10",
                         cur_next_ms_xor when others;
     --Update Tag
---    tag_input <= reverse_byte(lfsr_xor_mux(TAG_SIZE_BITS-1 downto 0)) xor tag_out when tag_reset = '0' else (others => '0');
     tag_input <= lfsr_xor_mux(TAG_SIZE_BITS-1 downto 0) xor tag_out when tag_reset = '0' else (others => '0');
 
     --Logic for ms_reg_mux and perm
@@ -188,19 +185,12 @@ begin
                             lfsr_xor_mux when "01",
                             x"0000000000000000" & npub_out when "10",
                             permout when others; 
-    perm_input <= ms_reg_out;
 
---    with data_count select
---        ms_out_mux2 <= ms_reg_out(CCW-1 downto 0) when 0,
---                       ms_reg_out((2*CCW)-1 downto CCW) when 1,
---                       ms_reg_out((3*CCW)-1 downto 2*CCW) when 2,
---                       ms_reg_out((4*CCW)-1 downto 3*CCW) when 3,
---                       ms_reg_out((5*CCW)-1 downto 4*CCW) when others;
-    --ms_out_mux2 <= ms_out_mux1 when data_count /= 4 else ms_reg_out(STATE_SIZE-1 downto 4*CCW);
     data_bdo <= bdi_or_key_rev xor ms_reg_out(CCW-1 downto 0);
-    bdo <= reverse_byte(data_out_mux);
-    tag_mux <= tag_out(TAG_SIZE_BITS-1 downto 32) when data_count = 1 else tag_out(31 downto 0);
-    data_out_mux <= data_bdo when bdo_sel ='0' else tag_mux;
+    with bdo_sel select
+        bdo <= data_bdo when "00",
+               tag_out(31 downto 0) when "01",
+               tag_out(TAG_SIZE_BITS-1 downto 32) when others;
     
 end behavioral;
 

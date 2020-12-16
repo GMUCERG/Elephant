@@ -59,7 +59,7 @@ end CryptoCore;
 architecture behavioral of CryptoCore is
     --internal signals for datapath
     signal bdo_s: std_logic_vector(CCW - 1 downto 0);
-    signal bdo_sel: std_logic;
+    signal bdo_sel: std_logic_vector(1 downto 0);
     signal saving_bdo: std_logic;
     signal bdi_size_intern: std_logic_vector(1 downto 0);
     signal data_type_sel: std_logic;
@@ -128,13 +128,13 @@ begin
             clk        => clk
         );
 
-    
+    bdo <= reverse_byte(bdo_s);
 state_control: process(all)
 begin
     bdo_valid <= '0';
     bdo_valid_bytes <= bdi_valid_bytes;
     bdo_type <=(others => '0');
-    bdo_sel <= '0';
+    bdo_sel <= "00";
     saving_bdo <= '0';
     msg_auth <= '0';
     msg_auth_valid <= '0';
@@ -143,7 +143,6 @@ begin
     key_ready <= '0';
     bdi_ready <= '0';
     bdi_size_intern <= bdi_size(1 downto 0);
-    bdo <= bdo_s;
     data_type_sel <= '0';
 
     load_data_en <= '0';
@@ -469,7 +468,6 @@ begin
             end if;
         end if;
     when TAG_S =>
-        bdo_sel <= '1';
         if decrypt_op /= '1' then
             bdo_valid_bytes <= (others => '1');
             bdo_type <= HDR_TAG;
@@ -479,6 +477,9 @@ begin
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     end_of_block <= '1';
                     n_ctl_s <= IDLE;
+                    bdo_sel <= "10";
+                else
+                    bdo_sel <= "01";
                 end if;
             end if;
         else
@@ -488,12 +489,14 @@ begin
                 if data_cnt_int = ELE_TAG_SIZE-1 then
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
+                    bdo_sel <= "10";
                     if (bdi /= bdo_s) then
                         msg_auth <= '0';
                     else
                         msg_auth <= tag_verified;
                     end if;
                 else
+                    bdo_sel <= "01";
                     if bdi /= bdo_s then
                         n_tag_verified <= '0';
                     end if;
