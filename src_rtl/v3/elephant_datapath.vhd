@@ -23,13 +23,14 @@ use work.Design_pkg.all;
 entity elephant_datapath is
     port(
         --Signals to con
-        key: in std_logic_vector(CCW_SIZE-1 downto 0);
-        bdi: in std_logic_vector(CCW_SIZE-1 downto 0);
-        bdi_size: in std_logic_vector(1 downto 0);
+        bdi_or_key: in std_logic_vector(CCW_SIZE-1 downto 0);
+        padding_extra: in std_logic;
+        bdi_valid_bytes : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
         data_type_sel: std_logic;
 
         load_data_en: in std_logic;
-        load_data_sel: in std_logic_vector(1 downto 0);
+        load_data_sel: in std_logic;
         lfsr_mux_sel: in std_logic_vector(1 downto 0);
         
         --Signals for key and npub
@@ -68,8 +69,6 @@ architecture behavioral of elephant_datapath is
     signal cur_next_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
 
     
-    signal bdi_or_key: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal bdi_or_key_rev : std_logic_vector(CCW_SIZE-1 downto 0);
     signal bdi_or_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
     signal padding_bdi: std_logic_vector(CCW_SIZE-1 downto 0);
 --    signal bdi_or_reset: std_logic_vector(CCW_SIZE-1 downto 0);
@@ -88,10 +87,27 @@ architecture behavioral of elephant_datapath is
 --    signal ms_out_mux1: std_logic_vector(CCW_SIZE-1 downto 0);
 --    signal ms_out_mux2: std_logic_vector(CCW_SIZE-1 downto 0);
     
-    signal data_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_bdo, data_bdo1: std_logic_vector(CCW_SIZE-1 downto 0);
     signal data_out: std_logic_vector(CCW_SIZE-1 downto 0);
     
+    signal lfsr_input: std_logic_vector(STATE_SIZE+16-1 downto 0);
+    signal lfsr_output: std_logic_vector(STATE_SIZE+16-1 downto 0);
+    signal lfsr_temp_rot: std_logic_vector(7 downto 0);
 begin
+    --LFSR output
+    --C code
+    --BYTE temp = rotl3(input[0]) ^ (input[3] << 7) ^ (input[13] >> 7);
+    lfsr_temp_rot <= (lfsr_output(4+16)  xor lfsr_output(24+16)) & lfsr_output(3+16 downto 0+16) & lfsr_output(7+16 downto 6+16) &
+                     (lfsr_output(5+16) xor lfsr_output(111+16));
+    lfsr_input <= lfsr_temp_rot & lfsr_output(STATE_SIZE+16-1 downto 8) when datap_lfsr_load = '0' else  key_out & x"0000";
+    datap_lfsr_out <= lfsr_output;
+
+    p_lfsr_data: process(clk, datap_lfsr_en)
+    begin
+        if rising_edge(clk) and datap_lfsr_en = '1' then
+            lfsr_output <= lfsr_input;
+        end if;
+    end process;
 
     PERM: entity work.elephant_perm
         port map(
@@ -100,14 +116,6 @@ begin
             perm_count => perm_count,
             load_lfsr => load_lfsr,
             output => permout
-        );
-    DATAP_LFSR: entity work.elephant_datapath_lfsr
-        port map(
-            load_key    => datap_lfsr_load,
-            clk         => clk,
-            key_in      => key_out,
-            en          => datap_lfsr_en,
-            ele_lfsr_output => datap_lfsr_out
         );
     p_ms_reg: process(clk, ms_en)
     begin
@@ -144,23 +152,13 @@ begin
     end process;
 
     --Select between process key or bdi
-    bdi_or_key <= bdi when data_type_sel = '0' else  key;
-    bdi_or_key_rev <= reverse_byte(bdi_or_key);
-    bdi_or_bdo <= bdi_or_key_rev when saving_bdo = '0' else data_bdo;
-    
-    
-   --Logic for how padding works
-    with bdi_size select
-        padding_bdi <= x"00000001" when "00",
-                       x"000001" & bdi_or_bdo(7 downto 0) when "01",
-                       x"0001" & bdi_or_bdo(15 downto 0) when "10",
-                       x"01" & bdi_or_bdo(23 downto 0) when others;
+    bdi_or_bdo <= bdi_or_key when saving_bdo = '0' else data_bdo;
+
     --Also mux is very large at the momment might be able to reduce to CCW size
     --mux to reset load_data and shift data input
     with load_data_sel select
-        load_data_input_mux <= x"00000000"  when "00",
-                               bdi_or_bdo   when "01",
-                               padding_bdi  when others;
+        load_data_input_mux <= x"0000000" &"000" & padding_extra  when '0',
+                               bdi_or_bdo   when others;
 
     --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
     --Would likely required this to happen after mux and => ms_reg would be zero prior
@@ -185,10 +183,12 @@ begin
                             lfsr_xor_mux when "01",
                             x"0000000000000000" & npub_out when "10",
                             permout when others; 
+    data_bdo1 <= bdi_or_key xor ms_reg_out(CCW-1 downto 0);
 
-    data_bdo <= bdi_or_key_rev xor ms_reg_out(CCW-1 downto 0);
+    data_bdo <= --padd(reverse_byte(data_bdo1),bdi_valid_bytes,bdi_pad_loc);
+        reverse_byte(padd(reverse_byte(data_bdo1),bdi_valid_bytes,bdi_pad_loc));
     with bdo_sel select
-        bdo <= data_bdo when "00",
+        bdo <= data_bdo1 when "00",
                tag_out(31 downto 0) when "01",
                tag_out(TAG_SIZE_BITS-1 downto 32) when others;
     

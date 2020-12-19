@@ -59,13 +59,16 @@ end CryptoCore;
 architecture behavioral of CryptoCore is
     --internal signals for datapath
     signal bdo_s: std_logic_vector(CCW - 1 downto 0);
+    signal bdi_padded: std_logic_vector(CCW-1 downto 0);
+    signal bdi_or_key: std_logic_vector(CCW-1 downto 0);
+    signal bdi_rev: std_logic_vector(CCW-1 downto 0);
     signal bdo_sel: std_logic_vector(1 downto 0);
     signal saving_bdo: std_logic;
-    signal bdi_size_intern: std_logic_vector(1 downto 0);
     signal data_type_sel: std_logic;
+    signal padding_extra: std_logic;
     
     signal load_data_en: std_logic;
-    signal load_data_sel: std_logic_vector(1 downto 0);
+    signal load_data_sel: std_logic;
     signal lfsr_mux_sel: std_logic_vector(1 downto 0);
     signal key_en: std_logic;
     signal npub_en: std_logic;
@@ -100,9 +103,10 @@ architecture behavioral of CryptoCore is
 begin
     ELEPHANT_DATAP: entity work.elephant_datapath
         port map(
-            key        => key,
-            bdi        => bdi,
-            bdi_size => bdi_size_intern,
+            bdi_or_key        => bdi_or_key,
+            padding_extra     => padding_extra,
+            bdi_valid_bytes => bdi_valid_bytes,
+            bdi_pad_loc => bdi_pad_loc,
             data_type_sel => data_type_sel,
             
             load_data_en  => load_data_en,
@@ -129,8 +133,12 @@ begin
         );
 
     bdo <= reverse_byte(bdo_s);
+    bdi_rev <= reverse_byte(bdi);
+    bdi_padded <= reverse_byte(padd(bdi,bdi_valid_bytes,bdi_pad_loc));
 state_control: process(all)
 begin
+    bdi_or_key <= bdi_padded;
+    padding_extra <= '0';
     bdo_valid <= '0';
     bdo_valid_bytes <= bdi_valid_bytes;
     bdo_type <=(others => '0');
@@ -142,11 +150,10 @@ begin
     
     key_ready <= '0';
     bdi_ready <= '0';
-    bdi_size_intern <= bdi_size(1 downto 0);
     data_type_sel <= '0';
 
     load_data_en <= '0';
-    load_data_sel <= "00";
+    load_data_sel <= '0';
     lfsr_mux_sel <= "00";
     key_en <= '0';
     npub_en <= '0';
@@ -187,6 +194,7 @@ begin
             end if;
         end if;
     when STORE_KEY =>
+        bdi_or_key <= reverse_byte(key);
         if data_cnt_int <= BLOCK_SIZE then
             if data_cnt_int < KEY_SIZE then
                 if key_valid = '1' then
@@ -194,12 +202,12 @@ begin
                     key_ready <= '1';
                     load_data_en <= '1';
                     data_type_sel <= '1'; --select key type
-                    load_data_sel <= "01";
+                    load_data_sel <= '1';
                 end if;
             else
                 n_data_cnt_int <= data_cnt_int + 1;
                 if data_cnt_int <= KEY_SIZE then
-                    load_data_sel <= "00"; --zero pad
+                    load_data_sel <= '0';
                     load_data_en <= '1';
                 else
                     ms_en <= '1';
@@ -210,7 +218,7 @@ begin
             n_ctl_s <= PERM_KEY;
             n_data_cnt_int <= 0;
             load_data_en <= '1'; -- clear input data reg
-            load_data_sel <= "11";
+            load_data_sel <= '0';
 --            ms_en <= '1';
 --            ms_sel <= "11";
             load_lfsr <= '1';
@@ -233,7 +241,7 @@ begin
                 bdi_ready <= '1';
                 n_data_cnt_int <= data_cnt_int + 1;
                 load_data_en <= '1';
-                load_data_sel <= "01";
+                load_data_sel <= '1';
             end if;
         --Store npub and then shift it all the way to beginning of the register
         elsif data_cnt_int = ELE_NPUB_SIZE then
@@ -247,7 +255,7 @@ begin
                 n_decrypt_op <= decrypt_in;
                 bdi_ready <= '1';
                 load_data_en <= '1';
-                load_data_sel <= "01";
+                load_data_sel <= '1';
             end if;
         --Store npub and then shift it all the way to beginning of the register
         elsif data_cnt_int = ELE_NPUB_SIZE then
@@ -264,11 +272,7 @@ begin
                     bdi_ready <= '1';
                     n_data_cnt_int <= data_cnt_int + 1;
                     load_data_en <= '1';
-                    if bdi_valid_bytes = "1111" then
-                        load_data_sel <= "01";
-                    else
-                        load_data_sel <= "10";
-                    end if;
+                    load_data_sel <= '1';
                     --Need to signal to send the tag
                     if bdi_eot = '1' then
                         if (data_cnt_int = BLOCK_SIZE-1 and bdi_valid_bytes = "1111") = False then
@@ -292,12 +296,12 @@ begin
             n_data_cnt_int <= data_cnt_int + 1;
             load_data_en <= '1';
             if (append_one = '1' or done_state = '0') and data_cnt_int /= BLOCK_SIZE then
-                load_data_sel <= "10";
-                bdi_size_intern <= "00";
+                load_data_sel <= '0';
+                padding_extra <= '1';
                 n_append_one <= '0';
                 n_done_state <= '1';
             else
-                load_data_sel <= "00"; --Zero pad
+                load_data_sel <= '0'; --Zero pad
             end if;
             if data_cnt_int = BLOCK_SIZE then
                 n_ctl_s <= PRE_PERM;
@@ -353,8 +357,6 @@ begin
             elsif bdi_type = HDR_MSG or bdi_type = HDR_CT then
                 if calling_state = MDATA_S then
                     n_ctl_s <= MDATA_NPUB;
-                    load_data_en <= '1';
-                    load_data_sel <= "11";
                 else
                     n_ctl_s <= MDATA_S;
                 end if;
@@ -382,7 +384,6 @@ begin
             end if;
         end if;
         ms_en <= '1';
---        ms_sel <= "01";
         load_lfsr <= '1'; --Resets counter and lfsr
         if calling_state = AD_S or calling_state = MDATA_S then
             datap_lfsr_en <= '1';
@@ -416,9 +417,11 @@ begin
             n_ctl_s <= PRE_PERM;
         end if;
     when MDATA_S =>
+        if bdi_type = HDR_MSG then
+            bdi_or_key <= bdi_rev;
+        end if;
         if (bdi_type = HDR_MSG or bdi_type = HDR_CT  or bdi_type = "0000") and 
             done_state /= '1' and data_cnt_int < BLOCK_SIZE and append_one /= '1' then
-
             if bdi_valid = '1' and bdo_ready = '1' then
                 ms_sel <= "00";
                 ms_en <= '1';
@@ -429,9 +432,9 @@ begin
                     n_data_cnt_int <= data_cnt_int + 1;
                     load_data_en <= '1';
                     if bdi_valid_bytes = "1111" then
-                        load_data_sel <= "01";
+                        load_data_sel <= '1';
                     else
-                        load_data_sel <= "10";
+                        load_data_sel <= '1';
                     end if;
                     if bdi_type = HDR_MSG then
                         bdo_type <= HDR_CT;
@@ -451,13 +454,13 @@ begin
         else
             n_data_cnt_int <= data_cnt_int + 1;
             if append_one = '1' and data_cnt_int /= BLOCK_SIZE then
-                load_data_sel <= "10";
-                bdi_size_intern <= "00";
+                load_data_sel <= '0';
+                padding_extra <= '1';
                 n_append_one <= '0';
                 n_done_state <= '1';
                 ms_sel <= "01";
             else
-                load_data_sel <= "00"; --Zero pad
+                load_data_sel <= '0'; --Zero pad
             end if;
             load_data_en <= '1';
             if data_cnt_int = BLOCK_SIZE then
@@ -490,14 +493,14 @@ begin
                     n_ctl_s <= IDLE;
                     msg_auth_valid <= '1';
                     bdo_sel <= "10";
-                    if (bdi /= bdo_s) then
+                    if (bdi_or_key /= bdo_s) then
                         msg_auth <= '0';
                     else
                         msg_auth <= tag_verified;
                     end if;
                 else
                     bdo_sel <= "01";
-                    if bdi /= bdo_s then
+                    if bdi_or_key /= bdo_s then
                         n_tag_verified <= '0';
                     end if;
                 end if;
