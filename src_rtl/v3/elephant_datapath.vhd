@@ -70,8 +70,6 @@ architecture behavioral of elephant_datapath is
 
     
     signal bdi_or_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
-    signal padding_bdi: std_logic_vector(CCW_SIZE-1 downto 0);
---    signal bdi_or_reset: std_logic_vector(CCW_SIZE-1 downto 0);
     signal load_data_input_mux: std_logic_vector(CCW_SIZE-1 downto 0);
     signal load_data_output: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_xor_mux: std_logic_vector(STATE_SIZE-1 downto 0);
@@ -84,8 +82,6 @@ architecture behavioral of elephant_datapath is
     -- Verifiy this size
     signal ms_reg_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_reg_out: std_logic_vector(STATE_SIZE-1 downto 0);
---    signal ms_out_mux1: std_logic_vector(CCW_SIZE-1 downto 0);
---    signal ms_out_mux2: std_logic_vector(CCW_SIZE-1 downto 0);
     
     signal data_bdo, data_bdo1: std_logic_vector(CCW_SIZE-1 downto 0);
     signal data_out: std_logic_vector(CCW_SIZE-1 downto 0);

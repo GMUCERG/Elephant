@@ -219,8 +219,6 @@ begin
             n_data_cnt_int <= 0;
             load_data_en <= '1'; -- clear input data reg
             load_data_sel <= '0';
---            ms_en <= '1';
---            ms_sel <= "11";
             load_lfsr <= '1';
         end if;
     when PERM_KEY =>
@@ -343,12 +341,6 @@ begin
             end if;
         end if;
         --Loading data
---        if calling_state = AD_S and done_state = '1' then
---            --Okay need to load npub
---            load_data_en <= '1';
---            load_data_sel <= "11";
---            ms_sel
---        end if;
     when POST_PERM =>
         --Determine if it should move to the next state
         if done_state = '0' then
