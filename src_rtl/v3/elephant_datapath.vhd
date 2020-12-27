@@ -23,12 +23,10 @@ use work.Design_pkg.all;
 entity elephant_datapath is
     port(
         --Signals to con
-        bdi_or_key: in std_logic_vector(CCW-1 downto 0);
         sipo: in std_logic_vector(STATE_SIZE-1 downto 0);
-        padding_extra: in std_logic;
-        padding_sel: in std_logic_vector(1 downto 0);
-        bdi_valid_bytes : in   std_logic_vector (CCWdiv8 -1 downto 0);
-        bdi_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        sipo_cnt : integer range 0 to BLOCK_SIZE;
+        sipo_valid_bytes : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        sipo_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
 
         piso_en: in std_logic;
         piso_sel: in std_logic_vector(1 downto 0);
@@ -74,43 +72,107 @@ architecture behavioral of elephant_datapath is
     signal piso, piso_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
 
     
-    signal ms_reg_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal mreg: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal mreg, ms_reg_input_mux, ms_mask_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal npub_xor : std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
 
-    signal adcreg, adcreg_input_mux, mask_temp, ad_mask, ct_mask: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal adc_padd, bdi_padd, piso_padd: std_logic_vector(CCW-1 downto 0);
+    signal adcreg, mask_temp, ad_mask, ct_mask: std_logic_vector(STATE_SIZE-1 downto 0);
+    type elephant_blocks_t is array (0 to (STATE_SIZE/32)-1) of std_logic_vector(31 downto 0);
+    signal adcreg_blocks: elephant_blocks_t;
     
     
     signal lfsr_input: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_output: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_temp_rot: std_logic_vector(7 downto 0);
+    
+    
 begin
     --Idea is to stop sipo on last byte
     --Load into here then padd next cycle in here while loading into sipo normally
---    -    data_bdo <= --padd(reverse_byte(data_bdo1),bdi_valid_bytes,bdi_pad_loc);
----        reverse_byte(padd(reverse_byte(data_bdo1),bdi_valid_bytes,bdi_pad_loc));
     mask_temp <= adcreg xor lfsr_next;
     ad_mask <= mask_temp xor lfsr_prev;
     ct_mask <= mask_temp xor lfsr_current;
 
-    bdi_padd <= padd(bdi_or_key, bdi_valid_bytes, bdi_pad_loc);
-    with padding_sel select
-       adc_padd <= x"0000000" &"000" & padding_extra  when "00",
-                   bdi_padd when "01",  --CT coming in from bdi
-                   piso_padd when others; --CT coming from piso
-
-    with adcreg_sel select
-        adcreg_input_mux <= permout2 when "000",
-                            sipo when "001",
-                            adc_padd & adcreg(STATE_SIZE-1 downto 0) when "010",
-                            ad_mask when "011",
-                            ct_mask when others;
+    ms_mask_out <= mreg xor sipo xor lfsr_current;
                              
-    p_adcreg: process(clk, ms_en)
+    p_adcreg: process(all)
     begin
-        if rising_edge(clk) and  adcreg_en = '1' then
-            adcreg <= adcreg_input_mux;
+            adcreg_blocks(0) <= adcreg(CCW-1 downto 0);
+            adcreg_blocks(1) <= adcreg(CCW*2-1 downto CCW);
+            adcreg_blocks(2) <= adcreg(CCW*3-1 downto CCW*2);
+            adcreg_blocks(3) <= adcreg(CCW*4-1 downto CCW*3);
+            adcreg_blocks(4) <= adcreg(CCW*5-1 downto CCW*4);
+            if adcreg_sel = "000" then
+                adcreg_blocks(0) <= permout2(CCW-1 downto 0);
+                adcreg_blocks(1) <= permout2(CCW*2-1 downto CCW);
+                adcreg_blocks(2) <= permout2(CCW*3-1 downto CCW*2);
+                adcreg_blocks(3) <= permout2(CCW*4-1 downto CCW*3);
+                adcreg_blocks(4) <= permout2(CCW*5-1 downto CCW*4);
+            elsif adcreg_sel = "001" then
+                adcreg_blocks(0) <= sipo(CCW-1 downto 0);
+                adcreg_blocks(1) <= sipo(CCW*2-1 downto CCW);
+                adcreg_blocks(2) <= sipo(CCW*3-1 downto CCW*2);
+                adcreg_blocks(3) <= sipo(CCW*4-1 downto CCW*3);
+                adcreg_blocks(4) <= sipo(CCW*5-1 downto CCW*4);
+            elsif adcreg_sel = "010" then
+
+                if sipo_cnt <= 1 then
+                --    adcreg_blocks(0) <= x"000000;
+                --elsif sipo_cnt = '1' then
+                    adcreg_blocks(0) <= reverse_byte(padd(ms_mask_out(CCW-1 downto 0),
+                                             sipo_valid_bytes,
+                                             sipo_pad_loc, x"01"));
+                    --adcreg_blocks(0) <= ms_mask_out(CCW-1 downto 0);
+                else --All of the bytes valid
+                    adcreg_blocks(0) <= reverse_byte(ms_mask_out(CCW-1 downto 0));
+                end if;
+                if sipo_cnt > 1 then
+                    adcreg_blocks(1) <= ms_mask_out(CCW*2-1 downto CCW);
+                else
+                    adcreg_blocks(1) <= (others => '0');
+                end if;
+                if sipo_cnt > 2 then
+                    adcreg_blocks(2) <= ms_mask_out(CCW*3-1 downto CCW*2);
+                else
+                    adcreg_blocks(2) <= (others => '0');
+                end if;
+                if sipo_cnt > 3 then
+                    adcreg_blocks(3) <= ms_mask_out(CCW*4-1 downto CCW*3);
+                else
+                    adcreg_blocks(3) <= (others => '0');
+                end if;
+                if sipo_cnt > 4 then
+                    adcreg_blocks(4) <= ms_mask_out(CCW*5-1 downto CCW*4);
+
+                else
+                    adcreg_blocks(4) <= (others => '0');
+                end if;
+                --adcreg_blocks(0) <= ms_mask_out(CCW-1 downto 0);
+                --adcreg_blocks(1) <= ms_mask_out(CCW*2-1 downto CCW);
+                --adcreg_blocks(2) <= ms_mask_out(CCW*3-1 downto CCW*2);
+                --adcreg_blocks(3) <= ms_mask_out(CCW*4-1 downto CCW*3);
+                --adcreg_blocks(4) <= ms_mask_out(CCW*5-1 downto CCW*4);
+            elsif adcreg_sel = "011" then
+                adcreg_blocks(0) <= ad_mask(CCW-1 downto 0);
+                adcreg_blocks(1) <= ad_mask(CCW*2-1 downto CCW);
+                adcreg_blocks(2) <= ad_mask(CCW*3-1 downto CCW*2);
+                adcreg_blocks(3) <= ad_mask(CCW*4-1 downto CCW*3);
+                adcreg_blocks(4) <= ad_mask(CCW*5-1 downto CCW*4);                
+            elsif adcreg_sel = "100" then
+                adcreg_blocks(0) <= ct_mask(CCW-1 downto 0);
+                adcreg_blocks(1) <= ct_mask(CCW*2-1 downto CCW);
+                adcreg_blocks(2) <= ct_mask(CCW*3-1 downto CCW*2);
+                adcreg_blocks(3) <= ct_mask(CCW*4-1 downto CCW*3);
+                adcreg_blocks(4) <= ct_mask(CCW*5-1 downto CCW*4);
+            elsif adcreg_sel = "111" then
+                adcreg_blocks(sipo_cnt) <=  padd(adcreg(CCW*(sipo_cnt+1)-1 downto CCW*sipo_cnt), sipo_valid_bytes, sipo_pad_loc, x"01");
+            end if;
+        if rising_edge(clk) then
+            if adcreg_en = '1' then
+                adcreg <= adcreg_blocks(4) & adcreg_blocks(3) & adcreg_blocks(2) & adcreg_blocks(1) & adcreg_blocks(0);
+            end if;
+            if key_en = '1' then
+                key_out <= adcreg_blocks(4) & adcreg_blocks(3) & adcreg_blocks(2) & adcreg_blocks(1) & adcreg_blocks(0);
+            end if;
         end if;
     end process;
 
@@ -168,15 +230,6 @@ begin
     end process;
 
 
-    
-
-    p_key_reg: process(clk, key_en)
-    begin
-        if rising_edge(clk) and key_en = '1' then
-            key_out <= adcreg_input_mux;
-        end if;
-    end process;
-
     p_npub_reg: process(clk, npub_en)
     begin
         if rising_edge(clk) and npub_en = '1' then
@@ -203,10 +256,10 @@ begin
     
     
     with piso_sel select
-        piso_input_mux <= x"0000000000000000"&tag_out when "00",
-                          sipo xor lfsr_current xor mreg when "01",
+        piso_input_mux <= x"000000000000000000000000"&tag_out when "00",
+                          ms_mask_out when "01",
                           x"00000000" & piso(STATE_SIZE-1 downto CCW) when others;
-    p_piso: process(clk, piso_en)
+    p_piso: process(all)
     begin
         if rising_edge(clk) and piso_en = '1' then
                 piso <= piso_input_mux;

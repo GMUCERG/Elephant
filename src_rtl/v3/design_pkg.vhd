@@ -41,7 +41,7 @@ package Design_pkg is
     --! Functions
     --! Reverse the Byte order of the input word.
     function reverse_byte( vec : std_logic_vector ) return std_logic_vector;
-    function padd( bdi, bdi_valid_bytes, bdi_pad_loc : std_logic_vector ) return std_logic_vector;
+    function padd( bdi, bdi_valid_bytes, bdi_pad_loc, pad_value : std_logic_vector ) return std_logic_vector;
     --! Reverse the Bit order of the input vector.
     function reverse_bit( vec : std_logic_vector ) return std_logic_vector;
 
@@ -65,7 +65,8 @@ package body Design_pkg is
 
         return res;
     end function reverse_byte;
-    function padd( bdi, bdi_valid_bytes, bdi_pad_loc : std_logic_vector) return std_logic_vector is
+    
+    function padd( bdi, bdi_valid_bytes, bdi_pad_loc, pad_value : std_logic_vector) return std_logic_vector is
         variable res : std_logic_vector(bdi'length - 1 downto 0) := (others => '0');
     begin
 
@@ -73,7 +74,7 @@ package body Design_pkg is
             if (bdi_valid_bytes(i) = '1') then
                 res(8*(i+1) - 1 downto 8*i) := bdi(8*(i+1) - 1 downto 8*i);
             elsif (bdi_pad_loc(i) = '1') then
-                res(8*(i+1) - 1 downto 8*i) := x"01";
+                res(8*(i+1) - 1 downto 8*i) := pad_value;--x"01";
             end if;
         end loop;
 
