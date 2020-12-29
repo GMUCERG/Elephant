@@ -24,7 +24,7 @@ entity elephant_datapath is
     port(
         --Signals to con
         sipo: in std_logic_vector(STATE_SIZE-1 downto 0);
-        sipo_cnt : integer range 0 to BLOCK_SIZE;
+        sipo_cnt : integer range 0 to BLOCK_SIZE+1;
         sipo_valid_bytes : in   std_logic_vector (CCWdiv8 -1 downto 0);
         sipo_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
 
@@ -76,10 +76,7 @@ architecture behavioral of elephant_datapath is
     signal npub_xor : std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
 
     signal adcreg, mask_temp, ad_mask, ct_mask: std_logic_vector(STATE_SIZE-1 downto 0);
-    type elephant_blocks_t is array (0 to (STATE_SIZE/32)-1) of std_logic_vector(31 downto 0);
-    signal adcreg_blocks: elephant_blocks_t;
-    
-    
+
     signal lfsr_input: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_output: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_temp_rot: std_logic_vector(7 downto 0);
@@ -96,82 +93,52 @@ begin
                              
     p_adcreg: process(all)
     begin
-            adcreg_blocks(0) <= adcreg(CCW-1 downto 0);
-            adcreg_blocks(1) <= adcreg(CCW*2-1 downto CCW);
-            adcreg_blocks(2) <= adcreg(CCW*3-1 downto CCW*2);
-            adcreg_blocks(3) <= adcreg(CCW*4-1 downto CCW*3);
-            adcreg_blocks(4) <= adcreg(CCW*5-1 downto CCW*4);
-            if adcreg_sel = "000" then
-                adcreg_blocks(0) <= permout2(CCW-1 downto 0);
-                adcreg_blocks(1) <= permout2(CCW*2-1 downto CCW);
-                adcreg_blocks(2) <= permout2(CCW*3-1 downto CCW*2);
-                adcreg_blocks(3) <= permout2(CCW*4-1 downto CCW*3);
-                adcreg_blocks(4) <= permout2(CCW*5-1 downto CCW*4);
-            elsif adcreg_sel = "001" then
-                adcreg_blocks(0) <= sipo(CCW-1 downto 0);
-                adcreg_blocks(1) <= sipo(CCW*2-1 downto CCW);
-                adcreg_blocks(2) <= sipo(CCW*3-1 downto CCW*2);
-                adcreg_blocks(3) <= sipo(CCW*4-1 downto CCW*3);
-                adcreg_blocks(4) <= sipo(CCW*5-1 downto CCW*4);
-            elsif adcreg_sel = "010" then
-
-                if sipo_cnt <= 1 then
-                --    adcreg_blocks(0) <= x"000000;
-                --elsif sipo_cnt = '1' then
-                    adcreg_blocks(0) <= reverse_byte(padd(ms_mask_out(CCW-1 downto 0),
-                                             sipo_valid_bytes,
-                                             sipo_pad_loc, x"01"));
-                    --adcreg_blocks(0) <= ms_mask_out(CCW-1 downto 0);
-                else --All of the bytes valid
-                    adcreg_blocks(0) <= reverse_byte(ms_mask_out(CCW-1 downto 0));
-                end if;
-                if sipo_cnt > 1 then
-                    adcreg_blocks(1) <= ms_mask_out(CCW*2-1 downto CCW);
-                else
-                    adcreg_blocks(1) <= (others => '0');
-                end if;
-                if sipo_cnt > 2 then
-                    adcreg_blocks(2) <= ms_mask_out(CCW*3-1 downto CCW*2);
-                else
-                    adcreg_blocks(2) <= (others => '0');
-                end if;
-                if sipo_cnt > 3 then
-                    adcreg_blocks(3) <= ms_mask_out(CCW*4-1 downto CCW*3);
-                else
-                    adcreg_blocks(3) <= (others => '0');
-                end if;
-                if sipo_cnt > 4 then
-                    adcreg_blocks(4) <= ms_mask_out(CCW*5-1 downto CCW*4);
-
-                else
-                    adcreg_blocks(4) <= (others => '0');
-                end if;
-                --adcreg_blocks(0) <= ms_mask_out(CCW-1 downto 0);
-                --adcreg_blocks(1) <= ms_mask_out(CCW*2-1 downto CCW);
-                --adcreg_blocks(2) <= ms_mask_out(CCW*3-1 downto CCW*2);
-                --adcreg_blocks(3) <= ms_mask_out(CCW*4-1 downto CCW*3);
-                --adcreg_blocks(4) <= ms_mask_out(CCW*5-1 downto CCW*4);
-            elsif adcreg_sel = "011" then
-                adcreg_blocks(0) <= ad_mask(CCW-1 downto 0);
-                adcreg_blocks(1) <= ad_mask(CCW*2-1 downto CCW);
-                adcreg_blocks(2) <= ad_mask(CCW*3-1 downto CCW*2);
-                adcreg_blocks(3) <= ad_mask(CCW*4-1 downto CCW*3);
-                adcreg_blocks(4) <= ad_mask(CCW*5-1 downto CCW*4);                
-            elsif adcreg_sel = "100" then
-                adcreg_blocks(0) <= ct_mask(CCW-1 downto 0);
-                adcreg_blocks(1) <= ct_mask(CCW*2-1 downto CCW);
-                adcreg_blocks(2) <= ct_mask(CCW*3-1 downto CCW*2);
-                adcreg_blocks(3) <= ct_mask(CCW*4-1 downto CCW*3);
-                adcreg_blocks(4) <= ct_mask(CCW*5-1 downto CCW*4);
-            elsif adcreg_sel = "111" then
-                adcreg_blocks(sipo_cnt) <=  padd(adcreg(CCW*(sipo_cnt+1)-1 downto CCW*sipo_cnt), sipo_valid_bytes, sipo_pad_loc, x"01");
-            end if;
         if rising_edge(clk) then
             if adcreg_en = '1' then
-                adcreg <= adcreg_blocks(4) & adcreg_blocks(3) & adcreg_blocks(2) & adcreg_blocks(1) & adcreg_blocks(0);
+                if adcreg_sel = "000" then
+                    adcreg <= permout2;
+                elsif adcreg_sel = "001" then
+                    adcreg <= sipo;
+                elsif adcreg_sel = "011" then
+                    adcreg <= ad_mask;
+                elsif adcreg_sel = "100" then
+                    adcreg <= ct_mask;
+                elsif adcreg_sel = "010" then
+                    if sipo_cnt <= 1 then
+                        adcreg(CCW-1 downto 0) <= reverse_byte(padd(reverse_byte(ms_mask_out(CCW-1 downto 0)),
+                                                sipo_valid_bytes,
+                                                sipo_pad_loc, x"01"));
+                    else --All of the bytes valid
+                        adcreg(CCW-1 downto 0) <= reverse_byte(ms_mask_out(CCW-1 downto 0));
+                    end if;
+                    if sipo_cnt > 1 then
+                        adcreg(CCW*2-1 downto CCW*1) <= ms_mask_out(CCW*2-1 downto CCW);
+                    else
+                        adcreg(CCW*2-1 downto CCW*1) <= (others => '0');
+                    end if;
+                    if sipo_cnt > 2 then
+                        adcreg(CCW*3-1 downto CCW*2) <= ms_mask_out(CCW*3-1 downto CCW*2);
+                    else
+                        adcreg(CCW*3-1 downto CCW*2) <= (others => '0');
+                    end if;
+                    if sipo_cnt > 3 then
+                        adcreg(CCW*4-1 downto CCW*3) <= ms_mask_out(CCW*4-1 downto CCW*3);
+                    else
+                        adcreg(CCW*4-1 downto CCW*3) <= (others => '0');
+                    end if;
+                    if sipo_cnt > 4 then
+                        adcreg(CCW*5-1 downto CCW*4) <= ms_mask_out(CCW*5-1 downto CCW*4);
+  
+                    else
+                        adcreg(CCW*5-1 downto CCW*4) <= (others => '0');
+                    end if;
+                --elsif adcreg_sel = "111" then
+                --    adcreg(sipo_cnt) <=  padd(adcreg(CCW*(sipo_cnt+1)-1 downto CCW*sipo_cnt), sipo_valid_bytes, sipo_pad_loc, x"01");                    
+                end if;
+            --adcreg <= adcreg_blocks(4) & adcreg_blocks(3) & adcreg_blocks(2) & adcreg_blocks(1) & adcreg_blocks(0);
             end if;
             if key_en = '1' then
-                key_out <= adcreg_blocks(4) & adcreg_blocks(3) & adcreg_blocks(2) & adcreg_blocks(1) & adcreg_blocks(0);
+                key_out <= permout2;
             end if;
         end if;
     end process;
