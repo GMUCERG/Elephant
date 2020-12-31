@@ -113,7 +113,6 @@ architecture behavioral of CryptoCore is
     
 begin
     bdi_padd <= reverse_byte(padd(bdi, bdi_valid_bytes, bdi_pad_loc, bdi_padd_value));
-    --bdi_padd <= reverse_byte(padd(bdi, bdi_valid_bytes, bdi_pad_loc, x"01"));*
     sipo <= sipo_blocks(4) & sipo_blocks(3) & sipo_blocks(2) & sipo_blocks(1) & sipo_blocks(0);
 p_sipo: process(all)
     begin
@@ -211,14 +210,15 @@ begin
                     n_sipo_pad_loc <= bdi_pad_loc;
                     if bdi_valid_bytes = "1111" then
                         n_append_one <= '1';
-                    elsif (sipo_cnt /= BLOCK_SIZE-1) then
+                    elsif (sipo_cnt /= BLOCK_SIZE) then
                         n_done_state <= '1';
                     end if;
                 end if;
             end if;
-        elsif n_append_one = '1' and sipo_cnt /= BLOCK_SIZE-1 then
+        elsif append_one = '1' and sipo_cnt /= BLOCK_SIZE then
             sipo_en <= '1';
             n_append_one <= '0';
+            n_done_state <= '1';
         elsif bdi_eot = '1' and bdi_type = "0000" and done_state = '0' then
             bdi_ready <= '1';
             sipo_en <= '1';
@@ -399,7 +399,7 @@ begin
             n_sipo_s <= PT;
         end if;
     when M_FULL =>
-       if sipo_cnt = BLOCK_SIZE-1 then
+       if sipo_cnt = BLOCK_SIZE then
             --adcreg_en <= '1';
             --adcreg_sel <= "001";
             ms_en <= '1';
@@ -485,6 +485,7 @@ p_piso: process(all)
         bdo_valid <= '0';
         bdo_valid_bytes <= (others => '0');
         n_piso_cnt <= piso_cnt;
+        piso_en <= '0';
         if piso_load = '1' then
             piso_en <= '1';
             if ctl_s = TAG_S then
