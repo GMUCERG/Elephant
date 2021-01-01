@@ -111,7 +111,7 @@ begin
                     adcreg <= ct_mask;
                 elsif adcreg_sel = "010" then
                     if sipo_cnt <= 1 then
-                        adcreg(CCW-1 downto 0) <= reverse_byte(padd(reverse_byte(ms_mask_out(CCW-1 downto 0)),
+                        adcreg(CCW-1 downto 0) <= reverse_byte(padd(reverse_byte(ms_mask_out0),
                                                 sipo_valid_bytes,
                                                 sipo_pad_loc, x"01"));
                     else --All of the bytes valid

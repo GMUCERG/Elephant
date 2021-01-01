@@ -221,9 +221,9 @@ begin
                 bdi_ready <= '1';
                 n_sipo_cnt <= sipo_cnt + 1;
                 sipo_en <= '1';
+                n_sipo_valid_bytes <= bdi_valid_bytes;
+                n_sipo_pad_loc <= bdi_pad_loc;
                 if bdi_eot = '1' then
-                    n_sipo_valid_bytes <= bdi_valid_bytes;
-                    n_sipo_pad_loc <= bdi_pad_loc;
                     if bdi_valid_bytes = "1111" then
                         n_append_one <= '1';
                     else
@@ -538,7 +538,7 @@ p_piso: process(all)
                             end_of_block <= '1';
                         end if;
                     else
-                        if piso_cnt-1 =0 then
+                        if piso_cnt-1 = 0  then
                             bdo_valid_bytes <= piso_valid_bytes;
                         else
                             bdo_valid_bytes <= (others => '1');
