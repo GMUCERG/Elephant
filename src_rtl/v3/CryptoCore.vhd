@@ -85,10 +85,10 @@ architecture behavioral of CryptoCore is
     type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
                        LOAD_LFSR_AD1, LOAD_LFSR_AD2, LOAD_LFSR_AD3,
                        AD_FULL, AD_PRE_PERM, AD_PERM, AD_POST_PERM,
-                       LOAD_LFSR_M, M_FULL, M_PRE_PERM, M_PERM, M_POST_PERM,
+                       LOAD_LFSR_M, M_LOAD_NPUB, M_NPUB_PERM, M_PRE_PERM, M_PERM, M_POST_PERM,
                        TAG_S, TAG_WAIT);
     signal n_ctl_s, ctl_s: ctl_state;
-    type sipo_state is (IDLE, RESET_SIPO, SIPO_KEY, NPUB, AD, PT, CT, STALL);
+    type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, STALL);
     signal n_sipo_s, sipo_s: sipo_state;
     --signal lfsr_loaded, n_lfsr_loaded: std_logic;
     signal done_state, n_done_state: std_logic;
@@ -101,12 +101,13 @@ architecture behavioral of CryptoCore is
     signal adcreg_valid, n_adcreg_valid :std_logic;
 
     signal sipo: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal sipo_en, sipo_rst: std_logic;
+    signal sipo_en, sipo_rst, sipo_rst_cnt: std_logic;
     type sipo_blocks_t is array (0 to (STATE_SIZE/32)-1) of std_logic_vector(31 downto 0);
     signal sipo_blocks: sipo_blocks_t;
     signal sipo_valid_bytes, n_sipo_valid_bytes,sipo_pad_loc, n_sipo_pad_loc :   std_logic_vector (CCWdiv8 -1 downto 0);
     signal piso_en, piso_load: std_logic;
     signal piso_sel: std_logic_vector(1 downto 0);
+    signal piso_valid_bytes, n_piso_valid_bytes :   std_logic_vector (CCWdiv8 -1 downto 0);
     signal bdi_padd: std_logic_vector(CCW-1 downto 0);
     signal bdi_padd_value: std_logic_vector(7 downto 0);
     signal n_ct_done_state, ct_done_state: std_logic;
@@ -152,9 +153,6 @@ begin
         n_done_state <= '0';
         n_sipo_valid_bytes <= (others => '0');
         n_sipo_pad_loc <= (others => '0');
-    when RESET_SIPO =>
-        n_sipo_cnt <= 0;
-        sipo_rst <= '1';
     when SIPO_KEY =>
         bdi_or_key <= reverse_byte(key);
         n_sipo_cnt <= sipo_cnt + 1;
@@ -178,8 +176,15 @@ begin
         else
             npub_en <= '1';
         end if;
-    when AD =>        
-        if bdi_type = HDR_AD and sipo_cnt < BLOCK_SIZE then
+    when AD =>
+        if sipo_rst_cnt = '1' then 
+            n_sipo_cnt <= 0;
+            sipo_rst <= '1';
+            if sipo_cnt = block_size and append_one = '1' then
+                n_sipo_pad_loc <= bdi_pad_loc;
+                n_sipo_valid_bytes <= bdi_valid_bytes;
+            end if;
+        elsif bdi_type = HDR_AD and sipo_cnt < BLOCK_SIZE then
             if bdi_valid = '1' then
                 bdi_ready <= '1';
                 n_sipo_cnt <= n_sipo_cnt + 1;
@@ -192,9 +197,11 @@ begin
                     end if;
                 end if;
             end if;
-        elsif n_append_one = '1' and sipo_cnt /= BLOCK_SIZE then
-            sipo_en <= '1';
-            n_append_one <= '0';
+        elsif append_one = '1' then
+            if sipo_cnt < BLOCK_SIZE then
+                sipo_en <= '1';
+                n_append_one <= '0';
+            end if;
         elsif bdi_eot = '1' and bdi_type = "0000" and done_state = '0' then
             bdi_ready <= '1';
             sipo_en <= '1';
@@ -202,7 +209,14 @@ begin
         end if;
     when PT =>
         bdi_padd_value <= x"00";
-        if bdi_type = HDR_PT and sipo_cnt < BLOCK_SIZE then
+        if sipo_rst_cnt = '1' then 
+            n_sipo_cnt <= 0;
+            sipo_rst <= '1';
+            if bdi_valid = '0' and append_one = '1' then
+                n_sipo_pad_loc <= bdi_pad_loc;
+                n_sipo_valid_bytes <= (others => '0');
+            end if;
+        elsif bdi_type = HDR_PT and sipo_cnt < BLOCK_SIZE then
             if bdi_valid = '1' then
                 bdi_ready <= '1';
                 n_sipo_cnt <= sipo_cnt + 1;
@@ -212,15 +226,17 @@ begin
                     n_sipo_pad_loc <= bdi_pad_loc;
                     if bdi_valid_bytes = "1111" then
                         n_append_one <= '1';
-                    elsif (sipo_cnt <= BLOCK_SIZE) then
+                    else
                         n_done_state <= '1';
                     end if;
                 end if;
             end if;
-        elsif append_one = '1' and sipo_cnt <= BLOCK_SIZE then
-            sipo_en <= '1';
-            n_append_one <= '0';
-            n_done_state <= '1';
+        elsif append_one = '1' then
+            if sipo_cnt < BLOCK_SIZE then
+                sipo_en <= '1';
+                n_append_one <= '0';
+                n_done_state <= '1';
+            end if;
         elsif bdi_eot = '1' and bdi_type = "0000" and done_state = '0' then
             bdi_ready <= '1';
             sipo_en <= '1';
@@ -288,6 +304,7 @@ begin
     -- Signal for data counter
     n_ctl_s <= ctl_s;
     n_sipo_s <= sipo_s;
+    sipo_rst_cnt <= '0';
     n_ct_done_state <= ct_done_state;
     n_decrypt_op <= decrypt_op;
     n_tag_verified <= tag_verified;
@@ -356,7 +373,7 @@ begin
         if sipo_cnt = BLOCK_SIZE-1 or done_state = '1' then
             adcreg_en <= '1';
             adcreg_sel <= "001";
-            n_sipo_s <= RESET_SIPO;
+            sipo_rst_cnt <= '1';
             n_ctl_s <= AD_PRE_PERM;
         end if;
     when AD_PRE_PERM =>
@@ -393,26 +410,32 @@ begin
         end if;
     when LOAD_LFSR_M =>
         datap_lfsr_en <= '1';
-        n_ctl_s <= M_FULL;
         n_adcreg_valid <= '0';
         if decrypt_op = '1' then
             n_sipo_s <= CT;
+            n_ctl_s <= TAG_S; -- TODO not correct
         else
             n_sipo_s <= PT;
+            n_ctl_s <= M_LOAD_NPUB;
         end if;
-    when M_FULL =>
-       if sipo_cnt > BLOCK_SIZE then
-            --adcreg_en <= '1';
-            --adcreg_sel <= "001";
+    when M_LOAD_NPUB =>
+        n_ctl_s <= M_NPUB_PERM;
+        ms_en <= '1';
+        ms_sel <= '0';
+        load_lfsr <= '1';
+
+    when M_NPUB_PERM =>
+        if perm_cnt_int = PERM_CYCLES-1 then
+            if sipo_cnt >= BLOCK_SIZE-1 or done_state = '1' then
+                ms_en <= '1';
+                ms_sel <= '1';
+                n_perm_cnt_int <= perm_cnt_int + 1;
+                n_ctl_s <= M_POST_PERM;
+            end if;
+        else
             ms_en <= '1';
-            ms_sel <= '0';
-            n_sipo_s <= RESET_SIPO;
-            n_ctl_s <= M_PRE_PERM;
-        elsif done_state = '1' then
-            ms_en <= '1';
-            ms_sel <= '0';
-            n_sipo_s <= STALL;
-            n_ctl_s <= M_PRE_PERM;
+            ms_sel <= '1';
+            n_perm_cnt_int <= perm_cnt_int + 1;      
         end if;
     when M_PRE_PERM =>
         ms_en <= '1';
@@ -446,6 +469,7 @@ begin
         piso_load <= '1';
         if ct_done_state = '0' then
             n_ctl_s <= M_PRE_PERM;
+            sipo_rst_cnt <= '1';
             if done_state = '1' then
                 n_ct_done_state <= '1';
             end if;
@@ -453,6 +477,7 @@ begin
             n_ctl_s <= TAG_S;
         end if;
         if adcreg_valid = '1' then
+            datap_lfsr_en <= '1';
             tag_sel <= "10";
         end if;
 
@@ -488,8 +513,10 @@ p_piso: process(all)
         bdo_valid_bytes <= (others => '0');
         n_piso_cnt <= piso_cnt;
         piso_en <= '0';
+        n_piso_valid_bytes <= piso_valid_bytes;
         if piso_load = '1' then
             piso_en <= '1';
+            n_piso_valid_bytes <= sipo_valid_bytes;
             if ctl_s = TAG_S then
                 piso_sel <= "00";
                 n_piso_cnt <= 2;
@@ -512,7 +539,7 @@ p_piso: process(all)
                         end if;
                     else
                         if piso_cnt-1 =0 then
-                            bdo_valid_bytes <= sipo_valid_bytes;
+                            bdo_valid_bytes <= piso_valid_bytes;
                         else
                             bdo_valid_bytes <= (others => '1');
                         end if;
@@ -538,6 +565,7 @@ begin
             ctl_s <= n_ctl_s;
             sipo_s <= n_sipo_s;
             sipo_valid_bytes <= n_sipo_valid_bytes;
+            piso_valid_bytes <= n_piso_valid_bytes;
             sipo_pad_loc <= n_sipo_pad_loc;
             done_state <= n_done_state;
             decrypt_op <= n_decrypt_op;
