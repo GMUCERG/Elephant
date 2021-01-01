@@ -124,7 +124,9 @@ p_sipo: process(all)
                 sipo_blocks(3) <= (others => '0');
                 sipo_blocks(4) <= (others => '0');
             elsif sipo_en = '1' then
-                sipo_blocks(sipo_cnt) <= bdi_or_key;
+                if sipo_cnt < BLOCK_SIZE then
+                    sipo_blocks(sipo_cnt) <= bdi_or_key;
+                end if;
             end if;
         end if;
     end process;
@@ -190,7 +192,7 @@ begin
                     end if;
                 end if;
             end if;
-        elsif n_append_one = '1' and sipo_cnt /= BLOCK_SIZE-1 then
+        elsif n_append_one = '1' and sipo_cnt /= BLOCK_SIZE then
             sipo_en <= '1';
             n_append_one <= '0';
         elsif bdi_eot = '1' and bdi_type = "0000" and done_state = '0' then
@@ -210,12 +212,12 @@ begin
                     n_sipo_pad_loc <= bdi_pad_loc;
                     if bdi_valid_bytes = "1111" then
                         n_append_one <= '1';
-                    elsif (sipo_cnt /= BLOCK_SIZE) then
+                    elsif (sipo_cnt <= BLOCK_SIZE) then
                         n_done_state <= '1';
                     end if;
                 end if;
             end if;
-        elsif append_one = '1' and sipo_cnt /= BLOCK_SIZE then
+        elsif append_one = '1' and sipo_cnt <= BLOCK_SIZE then
             sipo_en <= '1';
             n_append_one <= '0';
             n_done_state <= '1';
@@ -399,7 +401,7 @@ begin
             n_sipo_s <= PT;
         end if;
     when M_FULL =>
-       if sipo_cnt = BLOCK_SIZE then
+       if sipo_cnt > BLOCK_SIZE then
             --adcreg_en <= '1';
             --adcreg_sel <= "001";
             ms_en <= '1';
