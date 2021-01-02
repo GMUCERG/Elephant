@@ -99,6 +99,7 @@ architecture behavioral of CryptoCore is
     signal adcreg_en: std_logic;
     signal adcreg_sel: std_logic_vector(2 downto 0);
     signal adcreg_valid, n_adcreg_valid :std_logic;
+    signal ad_valid_bytes, ad_pad_loc :   std_logic_vector (CCWdiv8 -1 downto 0);
 
     signal sipo: std_logic_vector(STATE_SIZE-1 downto 0);
     signal sipo_en, sipo_rst, sipo_rst_cnt: std_logic;
@@ -113,7 +114,7 @@ architecture behavioral of CryptoCore is
     signal n_ct_done_state, ct_done_state: std_logic;
     
 begin
-    bdi_padd <= reverse_byte(padd(bdi, bdi_valid_bytes, bdi_pad_loc, bdi_padd_value));
+    bdi_padd <= reverse_byte(padd(bdi, ad_valid_bytes, ad_pad_loc, bdi_padd_value));
     sipo <= sipo_blocks(4) & sipo_blocks(3) & sipo_blocks(2) & sipo_blocks(1) & sipo_blocks(0);
 p_sipo: process(all)
     begin
@@ -144,6 +145,8 @@ begin
     n_append_one <= append_one;
     n_sipo_valid_bytes <= sipo_valid_bytes;
     n_sipo_pad_loc <= sipo_pad_loc;
+    ad_valid_bytes <= bdi_valid_bytes;
+    ad_pad_loc <= bdi_pad_loc;
     bdi_padd_value <= x"01";
     case sipo_s is
     when IDLE =>
@@ -177,22 +180,22 @@ begin
             npub_en <= '1';
         end if;
     when AD =>
+        if bdi_type /= HDR_AD then
+            ad_valid_bytes <= (others => '0');
+            ad_pad_loc <= "1000";
+        end if;
         if sipo_rst_cnt = '1' then 
             n_sipo_cnt <= 0;
             sipo_rst <= '1';
-            if sipo_cnt = block_size and append_one = '1' then
-                n_sipo_pad_loc <= bdi_pad_loc;
-                n_sipo_valid_bytes <= bdi_valid_bytes;
-            end if;
         elsif bdi_type = HDR_AD and sipo_cnt < BLOCK_SIZE then
             if bdi_valid = '1' then
                 bdi_ready <= '1';
-                n_sipo_cnt <= n_sipo_cnt + 1;
+                n_sipo_cnt <= sipo_cnt + 1;
                 sipo_en <= '1';
                 if bdi_eot = '1' then
                     if bdi_valid_bytes = "1111" then
                         n_append_one <= '1';
-                    elsif (sipo_cnt /= BLOCK_SIZE-1) then
+                    else
                         n_done_state <= '1';
                     end if;
                 end if;
@@ -201,6 +204,7 @@ begin
             if sipo_cnt < BLOCK_SIZE then
                 sipo_en <= '1';
                 n_append_one <= '0';
+                n_done_state <= '1';
             end if;
         elsif bdi_eot = '1' and bdi_type = "0000" and done_state = '0' then
             bdi_ready <= '1';
@@ -370,10 +374,11 @@ begin
 --            n_ctl_s <= LOAD_LFSR_AD1;
 --        end if;
     when AD_FULL =>
-        if sipo_cnt = BLOCK_SIZE-1 or done_state = '1' then
+        if sipo_cnt >= BLOCK_SIZE-1 or done_state = '1' then
             adcreg_en <= '1';
             adcreg_sel <= "001";
             sipo_rst_cnt <= '1';
+            n_adcreg_valid <= done_state;
             n_ctl_s <= AD_PRE_PERM;
         end if;
     when AD_PRE_PERM =>
@@ -382,9 +387,6 @@ begin
         --reset perm
         load_lfsr <= '1';
         n_ctl_s <= AD_PERM;
-        if done_state /= '1' then
-            n_sipo_s <= AD;
-        end if;
     when AD_PERM =>
         adcreg_sel <= "000";
         n_perm_cnt_int <= perm_cnt_int + 1;
@@ -396,7 +398,8 @@ begin
         adcreg_sel <= "011";
         adcreg_en <= '1';
         tag_sel <= "01";
-        if done_state = '1' then
+        datap_lfsr_en <= '1';
+        if adcreg_valid = '1' then
             if append_one = '1' then
                 n_ctl_s <= AD_FULL;
             else
@@ -441,6 +444,7 @@ begin
         adcreg_en <= '1';
         n_adcreg_valid <= '1';
         piso_load <= '1';
+        datap_lfsr_en <= '1';
         if ct_done_state = '0' then
             n_ctl_s <= M_PRE_PERM;
             sipo_rst_cnt <= '1';
@@ -450,7 +454,6 @@ begin
         else
             n_ctl_s <= TAG_S;
         end if;
-        datap_lfsr_en <= '1';
         if adcreg_valid = '1' then
             tag_sel <= "10";
         end if;
