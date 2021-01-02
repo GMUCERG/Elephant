@@ -85,7 +85,7 @@ architecture behavioral of CryptoCore is
     type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
                        LOAD_LFSR_AD1, LOAD_LFSR_AD2, LOAD_LFSR_AD3,
                        AD_FULL, AD_PRE_PERM, AD_PERM, AD_POST_PERM,
-                       LOAD_LFSR_M, M_LOAD_NPUB, M_NPUB_PERM, M_PRE_PERM, M_PERM, M_POST_PERM,
+                       M_PRE_PERM, M_PERM, M_POST_PERM,
                        TAG_S, TAG_WAIT);
     signal n_ctl_s, ctl_s: ctl_state;
     type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, STALL);
@@ -401,43 +401,17 @@ begin
                 n_ctl_s <= AD_FULL;
             else
                 n_sipo_s <= IDLE;
-                n_ctl_s <= LOAD_LFSR_M;
+                n_ctl_s <= M_PRE_PERM;
                 datap_lfsr_load <= '1';
                 datap_lfsr_en <= '1';
+                n_adcreg_valid <= '0';
             end if;
         else
             n_ctl_s <= AD_FULL;
         end if;
-    when LOAD_LFSR_M =>
-        datap_lfsr_en <= '1';
-        n_adcreg_valid <= '0';
-        if decrypt_op = '1' then
-            n_sipo_s <= CT;
-            n_ctl_s <= TAG_S; -- TODO not correct
-        else
-            n_sipo_s <= PT;
-            n_ctl_s <= M_LOAD_NPUB;
-        end if;
-    when M_LOAD_NPUB =>
-        n_ctl_s <= M_NPUB_PERM;
-        ms_en <= '1';
-        ms_sel <= '0';
-        load_lfsr <= '1';
 
-    when M_NPUB_PERM =>
-        if perm_cnt_int = PERM_CYCLES-1 then
-            if sipo_cnt >= BLOCK_SIZE-1 or done_state = '1' then
-                ms_en <= '1';
-                ms_sel <= '1';
-                n_perm_cnt_int <= perm_cnt_int + 1;
-                n_ctl_s <= M_POST_PERM;
-            end if;
-        else
-            ms_en <= '1';
-            ms_sel <= '1';
-            n_perm_cnt_int <= perm_cnt_int + 1;      
-        end if;
     when M_PRE_PERM =>
+        n_sipo_s <= PT;
         ms_en <= '1';
         ms_sel <= '0';
         adcreg_en <= '1';
@@ -476,8 +450,8 @@ begin
         else
             n_ctl_s <= TAG_S;
         end if;
+        datap_lfsr_en <= '1';
         if adcreg_valid = '1' then
-            datap_lfsr_en <= '1';
             tag_sel <= "10";
         end if;
 

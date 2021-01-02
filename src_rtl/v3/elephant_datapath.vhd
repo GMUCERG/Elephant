@@ -74,7 +74,6 @@ architecture behavioral of elephant_datapath is
     
     signal mreg, ms_reg_input_mux, ms_mask_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_mask_out0, ms_mask_out1, ms_mask_out2, ms_mask_out3, ms_mask_out4: std_logic_vector(CCW-1 downto 0);
-    signal npub_xor : std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
 
     signal adcreg, mask_temp, ad_mask, ct_mask: std_logic_vector(STATE_SIZE-1 downto 0);
 
@@ -90,7 +89,7 @@ begin
     ad_mask <= mask_temp xor lfsr_prev;
     ct_mask <= mask_temp xor lfsr_current;
 
-    ms_mask_out <= mreg xor sipo xor lfsr_current;
+    ms_mask_out <= mreg xor sipo xor lfsr_next;
     ms_mask_out0 <= ms_mask_out(CCW-1 downto 0);
     ms_mask_out1 <= ms_mask_out(CCW*2-1 downto CCW);
     ms_mask_out2 <= ms_mask_out(CCW*3-1 downto CCW*2);
@@ -224,10 +223,9 @@ begin
             output => permout2
         );
 
-    npub_xor <= npub_out xor lfsr_current(NPUB_SIZE_BITS-1 downto 0);
     with ms_sel select
         ms_reg_input_mux <= 
-                            lfsr_current(STATE_SIZE-1 downto NPUB_SIZE_BITS) & npub_xor when '0',
+                            lfsr_next(STATE_SIZE-1 downto NPUB_SIZE_BITS) & (npub_out xor lfsr_next(NPUB_SIZE_BITS-1 downto 0)) when '0',
                             permout1 when others;
 
     p_ms_reg: process(clk, ms_en)
