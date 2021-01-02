@@ -90,7 +90,6 @@ architecture behavioral of CryptoCore is
     signal n_ctl_s, ctl_s: ctl_state;
     type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, STALL);
     signal n_sipo_s, sipo_s: sipo_state;
-    --signal lfsr_loaded, n_lfsr_loaded: std_logic;
     signal done_state, n_done_state: std_logic;
     signal append_one, n_append_one: std_logic;
     signal decrypt_op, n_decrypt_op: std_logic;
@@ -103,8 +102,6 @@ architecture behavioral of CryptoCore is
 
     signal sipo: std_logic_vector(STATE_SIZE-1 downto 0);
     signal sipo_en, sipo_rst, sipo_rst_cnt: std_logic;
-    type sipo_blocks_t is array (0 to (STATE_SIZE/32)-1) of std_logic_vector(31 downto 0);
-    signal sipo_blocks: sipo_blocks_t;
     signal sipo_valid_bytes, n_sipo_valid_bytes,sipo_pad_loc, n_sipo_pad_loc :   std_logic_vector (CCWdiv8 -1 downto 0);
     signal piso_en, piso_load: std_logic;
     signal piso_sel: std_logic_vector(1 downto 0);
@@ -115,19 +112,22 @@ architecture behavioral of CryptoCore is
     
 begin
     bdi_padd <= reverse_byte(padd(bdi, ad_valid_bytes, ad_pad_loc, bdi_padd_value));
-    sipo <= sipo_blocks(4) & sipo_blocks(3) & sipo_blocks(2) & sipo_blocks(1) & sipo_blocks(0);
 p_sipo: process(all)
     begin
         if rising_edge(clk) then
             if sipo_rst = '1' then
-                sipo_blocks(0) <= (others => '0');
-                sipo_blocks(1) <= (others => '0');
-                sipo_blocks(2) <= (others => '0');
-                sipo_blocks(3) <= (others => '0');
-                sipo_blocks(4) <= (others => '0');
+                sipo <= (others => '0');
             elsif sipo_en = '1' then
-                if sipo_cnt < BLOCK_SIZE then
-                    sipo_blocks(sipo_cnt) <= bdi_or_key;
+                if sipo_cnt = 0 then
+                   sipo(CCW*1-1 downto CCW*0) <= bdi_or_key; 
+                elsif sipo_cnt = 1 then
+                   sipo(CCW*2-1 downto CCW*1) <= bdi_or_key; 
+                elsif sipo_cnt = 2 then
+                   sipo(CCW*3-1 downto CCW*2) <= bdi_or_key; 
+                elsif sipo_cnt = 3 then
+                   sipo(CCW*4-1 downto CCW*3) <= bdi_or_key; 
+                elsif sipo_cnt = 4 then
+                   sipo(CCW*5-1 downto CCW*4) <= bdi_or_key; 
                 end if;
             end if;
         end if;
@@ -328,6 +328,7 @@ begin
                 n_sipo_s <= SIPO_KEY;
             else
                 n_ctl_s <= LOAD_KEY;
+                n_sipo_s <= NPUB;
             end if;
         end if;
     when STORE_KEY =>
@@ -360,19 +361,12 @@ begin
     when LOAD_LFSR_AD3 =>
         datap_lfsr_en <= '1';
         n_ctl_s <= AD_FULL;
---    when LOAD_KEY =>
---        --Obtain NPUB
---        if data_cnt_int < ELE_NPUB_SIZE then
---            if bdi_valid = '1' then
---                n_data_cnt_int <= data_cnt_int + 1;
---                n_decrypt_op <= decrypt_in;
---                bdi_ready <= '1';
---            end if;
---        --Store npub and then shift it all the way to beginning of the register
---        elsif data_cnt_int = ELE_NPUB_SIZE then
---            npub_en <= '1';
---            n_ctl_s <= LOAD_LFSR_AD1;
---        end if;
+    when LOAD_KEY =>
+        n_decrypt_op <= decrypt_in;
+        if sipo_cnt = ELE_NPUB_SIZE then
+            n_ctl_s <= LOAD_LFSR_AD1;
+            n_sipo_s <= AD;
+        end if;
     when AD_FULL =>
         if sipo_cnt >= BLOCK_SIZE-1 or done_state = '1' then
             adcreg_en <= '1';
