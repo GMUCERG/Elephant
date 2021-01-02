@@ -353,7 +353,7 @@ begin
                 else
                     n_ctl_s <= MDATA_S;
                 end if;
-            elsif calling_state = MDATA_NPUB and (bdi_type = "0000" or bdi_type = HDR_TAG)  then
+            elsif calling_state = MDATA_NPUB and (bdi_type = "0000" or bdi_type = HDR_TAG or  bdi_type = HDR_NPUB)  then
                 -- Handles case where PT and CT are empty
                 n_ctl_s <= MDATA_S;
                 n_done_state <= '1';
