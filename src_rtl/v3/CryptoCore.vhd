@@ -88,7 +88,7 @@ architecture behavioral of CryptoCore is
                        M_PRE_PERM, M_PERM, M_POST_PERM,
                        TAG_S, TAG_WAIT);
     signal n_ctl_s, ctl_s: ctl_state;
-    type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, STALL);
+    type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, TAG);
     signal n_sipo_s, sipo_s: sipo_state;
     signal done_state, n_done_state: std_logic;
     signal append_one, n_append_one: std_logic;
@@ -248,6 +248,12 @@ begin
             n_sipo_valid_bytes <= bdi_valid_bytes;
             n_sipo_pad_loc <= bdi_pad_loc;
         end if;
+    when TAG =>
+        if bdi_type = HDR_TAG then
+            if bdi_valid = '1' and msg_auth_ready = '1' then
+                bdi_ready <= '1';
+            end if;
+        end if;
     when others =>
         null;
     end case;
@@ -318,7 +324,6 @@ begin
 
     case ctl_s is
     when IDLE =>
-        n_tag_verified <= '1';
         tag_sel <= "11";
         n_decrypt_op <= '0';
         n_ct_done_state <= '0';
@@ -455,20 +460,19 @@ begin
     when TAG_S =>
         piso_load <= '1';
         n_ctl_s <= TAG_WAIT;
+        n_sipo_s <= TAG;
     when TAG_WAIT =>
-        --if piso_cnt-1 = 0 then --and bdo_ready = '1' then
-        if bdo_ready = '1' then
-            if decrypt_op /= '1' then
+        if decrypt_op /= '1' then
+            if bdo_ready = '1' then
                 n_ctl_s <= IDLE;
                 n_sipo_s <= IDLE;
-            elsif bdi_valid = '1' then
+            end if;
+        else
+            if bdi_valid = '1' and msg_auth_ready = '1' and piso_cnt = 1 then
                 n_ctl_s <= IDLE;
                 n_sipo_s <= IDLE;
             end if;
         end if;
-        --end if;
-    when others =>
-        null;
     end case;
         
 end process;
@@ -488,6 +492,7 @@ p_piso: process(all)
         if piso_load = '1' then
             piso_en <= '1';
             n_piso_valid_bytes <= sipo_valid_bytes;
+            n_tag_verified <= '1';
             if ctl_s = TAG_S then
                 piso_sel <= "00";
                 n_piso_cnt <= 2;
@@ -496,8 +501,8 @@ p_piso: process(all)
                 n_piso_cnt <= sipo_cnt;
             end if;
         elsif piso_cnt > 0 then
+            piso_sel <= "11";
             if decrypt_op /= '1' then
-                piso_sel <= "11";
                 if bdo_ready = '1' then
                     piso_en <= '1';
                     n_piso_cnt <= piso_cnt - 1;
@@ -517,8 +522,23 @@ p_piso: process(all)
                         bdo_type <= HDR_TAG;
                     end if;
                 end if;
-            --else
-            --    null;
+            else
+                if bdi_valid = '1' and msg_auth_ready = '1' then
+                    piso_en <= '1';
+                    n_piso_cnt <= piso_cnt - 1;
+                    if piso_cnt - 1 = 0 then
+                        msg_auth_valid <= '1';
+                        if reverse_byte(bdi) /= bdo_s then
+                            msg_auth <= '0';
+                        else
+                            msg_auth <= tag_verified;
+                        end if;
+                    else
+                        if reverse_byte(bdi) /= bdo_s then
+                            n_tag_verified <= '0';
+                        end if;
+                    end if;
+                end if;
             end if;
         end if;
     end process;
