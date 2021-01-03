@@ -109,6 +109,7 @@ architecture behavioral of CryptoCore is
     signal bdi_padd: std_logic_vector(CCW-1 downto 0);
     signal bdi_padd_value: std_logic_vector(7 downto 0);
     signal n_ct_done_state, ct_done_state: std_logic;
+    signal bdi_bdo_equal: std_logic;
     
 begin
     bdi_padd <= reverse_byte(padd(bdi, ad_valid_bytes, ad_pad_loc, bdi_padd_value));
@@ -317,7 +318,6 @@ begin
     sipo_rst_cnt <= '0';
     n_ct_done_state <= ct_done_state;
     n_decrypt_op <= decrypt_op;
-    n_tag_verified <= tag_verified;
     n_perm_cnt_int <= 0;
     piso_load <= '0';
     
@@ -480,8 +480,6 @@ end process;
 
 p_piso: process(all)
     begin
-        msg_auth <= '0';
-        msg_auth_valid <= '0';
         end_of_block <= '0';
         bdo_type <=(others => '0');
         bdo_valid <= '0';
@@ -489,6 +487,7 @@ p_piso: process(all)
         n_piso_cnt <= piso_cnt;
         piso_en <= '0';
         n_piso_valid_bytes <= piso_valid_bytes;
+        bdi_bdo_equal <= '1';
         if piso_load = '1' then
             piso_en <= '1';
             n_piso_valid_bytes <= sipo_valid_bytes;
@@ -526,17 +525,13 @@ p_piso: process(all)
                 if bdi_valid = '1' and msg_auth_ready = '1' then
                     piso_en <= '1';
                     n_piso_cnt <= piso_cnt - 1;
+                    if reverse_byte(bdi) /= bdo_s then
+                        bdi_bdo_equal <= '0';
+                    end if;
+                    n_tag_verified <= tag_verified and bdi_bdo_equal;
                     if piso_cnt - 1 = 0 then
                         msg_auth_valid <= '1';
-                        if reverse_byte(bdi) /= bdo_s then
-                            msg_auth <= '0';
-                        else
-                            msg_auth <= tag_verified;
-                        end if;
-                    else
-                        if reverse_byte(bdi) /= bdo_s then
-                            n_tag_verified <= '0';
-                        end if;
+                        msg_auth <= n_tag_verified;
                     end if;
                 end if;
             end if;
