@@ -69,7 +69,7 @@ architecture behavioral of CryptoCore is
     
     --Signals for permutation
     signal load_lfsr:std_logic;
-    signal ms_sel: std_logic;--_vector(1 downto 0);
+    signal ms_sel: std_logic;
     
     --Signals for datapath lsfr
     signal datap_lfsr_load: std_logic;
@@ -86,6 +86,7 @@ architecture behavioral of CryptoCore is
                        LOAD_LFSR_AD1, LOAD_LFSR_AD2, LOAD_LFSR_AD3,
                        AD_FULL, AD_PRE_PERM, AD_PERM, AD_POST_PERM,
                        M_PRE_PERM, M_PERM, M_POST_PERM,
+                       CT_DELAY, CT_FULL,
                        TAG_S, TAG_WAIT);
     signal n_ctl_s, ctl_s: ctl_state;
     type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, TAG);
@@ -213,15 +214,23 @@ begin
             n_done_state <= '1';
         end if;
     when PT =>
-        bdi_padd_value <= x"00";
+        if decrypt_op = '1' then
+            bdi_padd_value <= x"01";
+        else
+            bdi_padd_value <= x"00";
+        end if;
+        if bdi_type = HDR_TAG then
+            ad_valid_bytes <= (others => '0');
+            ad_pad_loc <= "1000";
+        end if;
         if sipo_rst_cnt = '1' then 
             n_sipo_cnt <= 0;
             sipo_rst <= '1';
-            if bdi_valid = '0' and append_one = '1' then
+            if (bdi_valid = '0' or bdi_type = HDR_TAG) and append_one = '1' then
                 n_sipo_pad_loc <= bdi_pad_loc;
                 n_sipo_valid_bytes <= (others => '0');
             end if;
-        elsif bdi_type = HDR_PT and sipo_cnt < BLOCK_SIZE then
+        elsif (bdi_type = HDR_PT or bdi_type = HDR_CT) and sipo_cnt < BLOCK_SIZE then
             if bdi_valid = '1' then
                 bdi_ready <= '1';
                 n_sipo_cnt <= sipo_cnt + 1;
@@ -276,8 +285,8 @@ end process;
             tag_sel => tag_sel,
 
             ms_en => ms_en,
-            ms_sel => ms_sel,            
-
+            ms_sel => ms_sel,
+            ms_next_current => decrypt_op,
             
             datap_lfsr_load => datap_lfsr_load,
             datap_lfsr_en => datap_lfsr_en,
@@ -403,7 +412,11 @@ begin
                 n_ctl_s <= AD_FULL;
             else
                 n_sipo_s <= IDLE;
-                n_ctl_s <= M_PRE_PERM;
+                if decrypt_op = '1' then
+                    n_ctl_s <= CT_DELAY;
+                else
+                    n_ctl_s <= M_PRE_PERM;
+                end if;
                 datap_lfsr_load <= '1';
                 datap_lfsr_en <= '1';
                 n_adcreg_valid <= '0';
@@ -411,7 +424,18 @@ begin
         else
             n_ctl_s <= AD_FULL;
         end if;
-
+    when CT_DELAY =>
+        n_adcreg_valid <= '1';
+        n_sipo_s <= PT;
+        datap_lfsr_en <= '1';
+        n_ctl_s <= CT_FULL;
+    when CT_FULL =>
+        if sipo_cnt >= BLOCK_SIZE or done_state = '1' then
+            adcreg_en <= '1';
+            adcreg_sel <= "001";
+            n_adcreg_valid <= '1';
+            n_ctl_s <= M_PRE_PERM;
+        end if;
     when M_PRE_PERM =>
         n_sipo_s <= PT;
         ms_en <= '1';
@@ -422,20 +446,18 @@ begin
         load_lfsr <= '1';
         n_ctl_s <= M_PERM;
     when M_PERM =>
+        ms_sel <= '1';
+        adcreg_sel <= "000";
         if perm_cnt_int = PERM_CYCLES-1 then
             if piso_cnt = 0 then
-                adcreg_sel <= "000";
                 adcreg_en <= '1';
                 ms_en <= '1';
-                ms_sel <= '1';
                 n_perm_cnt_int <= perm_cnt_int + 1;
                 n_ctl_s <= M_POST_PERM;
             end if;            
         else
-            adcreg_sel <= "000";
             adcreg_en <= '1';
             ms_en <= '1';
-            ms_sel <= '1';
             n_perm_cnt_int <= perm_cnt_int + 1;            
         end if;
     when M_POST_PERM =>
@@ -445,10 +467,18 @@ begin
         piso_load <= '1';
         datap_lfsr_en <= '1';
         if ct_done_state = '0' then
-            n_ctl_s <= M_PRE_PERM;
             sipo_rst_cnt <= '1';
-            if done_state = '1' then
-                n_ct_done_state <= '1';
+            if decrypt_op = '0' then
+                n_ctl_s <= M_PRE_PERM;
+                if done_state = '1' then
+                    n_ct_done_state <= '1';
+                end if;
+            else
+                if done_state = '1' then
+                    n_ctl_s <= TAG_S;
+                else
+                    n_ctl_s <= CT_FULL;
+                end if;
             end if;
         else
             n_ctl_s <= TAG_S;
@@ -458,9 +488,11 @@ begin
         end if;
 
     when TAG_S =>
-        piso_load <= '1';
-        n_ctl_s <= TAG_WAIT;
-        n_sipo_s <= TAG;
+        if piso_cnt = 0 then
+            piso_load <= '1';
+            n_ctl_s <= TAG_WAIT;
+            n_sipo_s <= TAG;
+        end if;
     when TAG_WAIT =>
         if decrypt_op /= '1' then
             if bdo_ready = '1' then
@@ -488,6 +520,7 @@ p_piso: process(all)
         piso_en <= '0';
         n_piso_valid_bytes <= piso_valid_bytes;
         bdi_bdo_equal <= '1';
+        msg_auth_valid <= '0';
         if piso_load = '1' then
             piso_en <= '1';
             n_piso_valid_bytes <= sipo_valid_bytes;
@@ -501,37 +534,48 @@ p_piso: process(all)
             end if;
         elsif piso_cnt > 0 then
             piso_sel <= "11";
-            if decrypt_op /= '1' then
+            if ctl_s = TAG_WAIT or ctl_s = IDLE then
+                if decrypt_op /= '1' then
+                    if bdo_ready = '1' then
+                        piso_en <= '1';
+                        n_piso_cnt <= piso_cnt - 1;
+                        bdo_valid <= '1';
+                        if ctl_s = TAG_WAIT or ctl_s = IDLE then 
+                            bdo_valid_bytes <= (others => '1');
+                            bdo_type <= HDR_TAG; 
+                            if piso_cnt-1 = 0 then
+                                end_of_block <= '1';
+                            end if;
+                        end if;
+                    end if;
+                else
+                    if bdi_valid = '1' and msg_auth_ready = '1' then
+                        piso_en <= '1';
+                        n_piso_cnt <= piso_cnt - 1;
+                        if reverse_byte(bdi) /= bdo_s then
+                            bdi_bdo_equal <= '0';
+                        end if;
+                        n_tag_verified <= tag_verified and bdi_bdo_equal;
+                        if piso_cnt - 1 = 0 then
+                            msg_auth_valid <= '1';
+                            msg_auth <= n_tag_verified;
+                        end if;
+                    end if;
+                end if;
+            else
                 if bdo_ready = '1' then
                     piso_en <= '1';
                     n_piso_cnt <= piso_cnt - 1;
                     bdo_valid <= '1';
-                    if ctl_s = TAG_WAIT or ctl_s = IDLE then 
-                        bdo_valid_bytes <= (others => '1');
-                        bdo_type <= HDR_TAG; 
-                        if piso_cnt-1 = 0 then
-                            end_of_block <= '1';
-                        end if;
+                    if decrypt_op = '1' then
+                        bdo_type <= HDR_CT;
                     else
-                        if piso_cnt-1 = 0  then
-                            bdo_valid_bytes <= piso_valid_bytes;
-                        else
-                            bdo_valid_bytes <= (others => '1');
-                        end if;
-                        bdo_type <= HDR_TAG;
+                        bdo_type <= HDR_PT;
                     end if;
-                end if;
-            else
-                if bdi_valid = '1' and msg_auth_ready = '1' then
-                    piso_en <= '1';
-                    n_piso_cnt <= piso_cnt - 1;
-                    if reverse_byte(bdi) /= bdo_s then
-                        bdi_bdo_equal <= '0';
-                    end if;
-                    n_tag_verified <= tag_verified and bdi_bdo_equal;
-                    if piso_cnt - 1 = 0 then
-                        msg_auth_valid <= '1';
-                        msg_auth <= n_tag_verified;
+                    if piso_cnt-1 = 0  then
+                        bdo_valid_bytes <= piso_valid_bytes;
+                    else
+                        bdo_valid_bytes <= (others => '1');
                     end if;
                 end if;
             end if;

@@ -38,6 +38,7 @@ entity elephant_datapath is
         
         ms_en: in std_logic;
         ms_sel: in std_logic;
+        ms_next_current: in std_logic;
 
         
         datap_lfsr_load: in std_logic;
@@ -62,6 +63,7 @@ architecture behavioral of elephant_datapath is
     signal lfsr_current: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_next: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_prev: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_next_or_current:std_logic_vector(STATE_SIZE-1 downto 0);
     
     signal key_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal npub_out: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
@@ -85,11 +87,13 @@ architecture behavioral of elephant_datapath is
 begin
     --Idea is to stop sipo on last byte
     --Load into here then padd next cycle in here while loading into sipo normally
+    lfsr_next_or_current <= lfsr_next when ms_next_current = '0' else lfsr_current;
+    
     mask_temp <= adcreg xor lfsr_next;
     ad_mask <= mask_temp xor lfsr_prev;
     ct_mask <= mask_temp xor lfsr_current;
 
-    ms_mask_out <= mreg xor sipo xor lfsr_next;
+    ms_mask_out <= mreg xor sipo xor lfsr_next_or_current;
     ms_mask_out0 <= ms_mask_out(CCW-1 downto 0);
     ms_mask_out1 <= ms_mask_out(CCW*2-1 downto CCW);
     ms_mask_out2 <= ms_mask_out(CCW*3-1 downto CCW*2);
@@ -223,10 +227,9 @@ begin
             output => permout2
         );
 
-    with ms_sel select
-        ms_reg_input_mux <= 
-                            lfsr_next(STATE_SIZE-1 downto NPUB_SIZE_BITS) & (npub_out xor lfsr_next(NPUB_SIZE_BITS-1 downto 0)) when '0',
-                            permout1 when others;
+    ms_reg_input_mux <= permout1 when ms_sel = '1' else 
+                                        lfsr_next_or_current(STATE_SIZE-1 downto NPUB_SIZE_BITS) & 
+                                        (npub_out xor lfsr_next_or_current(NPUB_SIZE_BITS-1 downto 0));
 
     p_ms_reg: process(clk, ms_en)
     begin
