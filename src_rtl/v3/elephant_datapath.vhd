@@ -29,7 +29,7 @@ entity elephant_datapath is
         sipo_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
 
         piso_en: in std_logic;
-        piso_sel: in std_logic_vector(1 downto 0);
+        piso_sel: in std_logic;
         
         --Signals for key and npub
         key_en: in std_logic;
@@ -50,6 +50,7 @@ entity elephant_datapath is
         sel_prev: in std_logic;
         
         bdo: out std_logic_vector(CCW_SIZE-1 downto 0);
+        bdo_tag: in std_logic;
 
         load_lfsr: in std_logic;
         perm_count: in integer range 0 to PERM_CYCLES;
@@ -247,7 +248,7 @@ begin
     begin
         if rising_edge(clk) then
             if tag_rst = '1' then
-                tag_out <= (others => '0');
+                tag_out <= x"00000000" & tag_out(CCW*2-1 downto CCW);
             else
                 if tag_en = '1' then
                     tag_out <= tag_out xor mask_temp(TAG_SIZE_BITS-1 downto 0) xor lfsr_prev_or_current(TAG_SIZE_BITS-1 downto 0);
@@ -257,10 +258,7 @@ begin
     end process;
     
     
-    with piso_sel select
-        piso_input_mux <= x"000000000000000000000000"&tag_out when "00",
-                          ms_mask_out when "01",
-                          x"00000000" & piso(STATE_SIZE-1 downto CCW) when others;
+    piso_input_mux <= ms_mask_out when piso_sel = '1' else x"00000000" & piso(STATE_SIZE-1 downto CCW);
     p_piso: process(all)
     begin
         if rising_edge(clk) and piso_en = '1' then
@@ -268,7 +266,7 @@ begin
         end if;
     end process;
     
-    bdo <= piso(CCW-1 downto 0);
+    bdo <= piso(CCW-1 downto 0) when bdo_tag = '0' else tag_out(CCW-1 downto 0);
     
 end behavioral;
 
