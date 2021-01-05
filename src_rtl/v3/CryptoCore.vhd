@@ -63,7 +63,7 @@ architecture behavioral of CryptoCore is
     
     signal key_en: std_logic;
     signal npub_en: std_logic;
-    signal tag_sel: std_logic_vector(1 downto 0);
+    signal tag_en, tag_rst: std_logic;
 
     signal ms_en: std_logic;
     
@@ -283,7 +283,8 @@ end process;
 
             key_en => key_en,
             npub_en => npub_en,
-            tag_sel => tag_sel,
+            tag_rst => tag_rst,
+            tag_en => tag_en,
 
             ms_en => ms_en,
             ms_sel => ms_sel,
@@ -311,8 +312,8 @@ begin
     n_adcreg_valid <= adcreg_valid; 
 
     key_en <= '0';
-    tag_sel <= "00";
-
+    tag_rst <= '0';
+    tag_en <= '0';
     ms_en <= '0';
     ms_sel <= '0';
     adcreg_en <= '0';
@@ -336,7 +337,7 @@ begin
 
     case ctl_s is
     when IDLE =>
-        tag_sel <= "11";
+        tag_rst <= '1';
         n_decrypt_op <= '0';
         n_ct_done_state <= '0';
         if bdi_valid = '1' or key_valid = '1' then
@@ -408,7 +409,7 @@ begin
     when AD_POST_PERM =>
         adcreg_sel <= "11";
         adcreg_en <= '1';
-        tag_sel <= "01";
+        tag_en <= '1';
         datap_lfsr_en <= '1';
         if adcreg_valid = '1' then
             if append_one = '1' then
@@ -467,6 +468,7 @@ begin
     when M_POST_PERM =>
         adcreg_sel <= "10";
         adcreg_en <= '1';
+        sel_prev <= '0';
         n_adcreg_valid <= '1';
         piso_load <= '1';
         datap_lfsr_en <= '1';
@@ -488,7 +490,7 @@ begin
             n_ctl_s <= TAG_S;
         end if;
         if adcreg_valid = '1' then
-            tag_sel <= "10";
+            tag_en <= '1';
         end if;
 
     when TAG_S =>

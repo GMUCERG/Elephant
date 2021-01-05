@@ -34,7 +34,8 @@ entity elephant_datapath is
         --Signals for key and npub
         key_en: in std_logic;
         npub_en: in std_logic;
-        tag_sel: in std_logic_vector(1 downto 0);
+        tag_rst: in std_logic;
+        tag_en: in std_logic;
         
         ms_en: in std_logic;
         ms_sel: in std_logic;
@@ -68,8 +69,7 @@ architecture behavioral of elephant_datapath is
     
     signal key_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal npub_out: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
-    signal tag_out, tag_temp, tag_ad, tag_ct: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
-    signal tag_input: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_out : std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     
 
     signal piso, piso_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
@@ -243,20 +243,16 @@ begin
         end if;
     end process;
 
-    tag_temp <= tag_out xor mask_temp(TAG_SIZE_BITS-1 downto 0);
-    tag_ad <= tag_temp xor lfsr_prev(TAG_SIZE_BITS-1 downto 0);
-    tag_ct <= tag_temp xor lfsr_current(TAG_SIZE_BITS-1 downto 0);
-
-    --Update Tag
-    with tag_sel select
-        tag_input <= tag_out when "00",
-                     tag_ad when "01",
-                     tag_ct when "10",
-                     (others =>'0') when others;
     p_tag_reg: process(clk)
     begin
         if rising_edge(clk) then
-            tag_out <= tag_input;
+            if tag_rst = '1' then
+                tag_out <= (others => '0');
+            else
+                if tag_en = '1' then
+                    tag_out <= tag_out xor mask_temp(TAG_SIZE_BITS-1 downto 0) xor lfsr_prev_or_current(TAG_SIZE_BITS-1 downto 0);
+                end if;
+            end if;
         end if;
     end process;
     
