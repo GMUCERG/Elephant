@@ -83,7 +83,7 @@ architecture behavioral of CryptoCore is
     signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
     
     type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
-                       LOAD_LFSR_AD1, LOAD_LFSR_AD2, LOAD_LFSR_AD3,
+                       LOAD_LFSR_AD,
                        AD_FULL, AD_PRE_PERM, AD_PERM, AD_POST_PERM,
                        M_PRE_PERM, M_PERM, M_POST_PERM,
                        CT_DELAY, CT_FULL,
@@ -341,7 +341,6 @@ begin
     case ctl_s is
     when IDLE =>
         tag_rst <= '1';
-        n_decrypt_op <= '0';
         n_ct_done_state <= '0';
         if bdi_valid = '1' or key_valid = '1' then
             if key_update = '1' then
@@ -362,30 +361,28 @@ begin
     when PERM_KEY =>
         adcreg_en <= '1';
         adcreg_sel <= "00";
-        n_perm_cnt_int <= perm_cnt_int + 1;
         if perm_cnt_int = PERM_CYCLES-1 then
             --Save the perm key
              key_en <= '1';
-             n_ctl_s <= LOAD_LFSR_AD1;
+             n_ctl_s <= LOAD_LFSR_AD;
+        else
+            n_perm_cnt_int <= perm_cnt_int + 1;
         end if;
         if sipo_cnt = ELE_NPUB_SIZE then 
             n_sipo_s <= AD;
         end if;
+    when LOAD_LFSR_AD =>
         n_decrypt_op <= decrypt_in;
-    when LOAD_LFSR_AD1 =>
+        if perm_cnt_int = 0 then
+            datap_lfsr_load <= '1';
+        elsif perm_cnt_int = 2 then
+            n_ctl_s <= AD_FULL;
+        end if;
+        n_perm_cnt_int <= perm_cnt_int + 1;
         datap_lfsr_en <= '1';
-        datap_lfsr_load <= '1';
-        n_ctl_s <= LOAD_LFSR_AD2;
-    when LOAD_LFSR_AD2 =>
-        datap_lfsr_en <= '1';
-        n_ctl_s <= LOAD_LFSR_AD3;
-    when LOAD_LFSR_AD3 =>
-        datap_lfsr_en <= '1';
-        n_ctl_s <= AD_FULL;
     when LOAD_KEY =>
-        n_decrypt_op <= decrypt_in;
         if sipo_cnt = ELE_NPUB_SIZE then
-            n_ctl_s <= LOAD_LFSR_AD1;
+            n_ctl_s <= LOAD_LFSR_AD;
             n_sipo_s <= AD;
         end if;
     when AD_FULL =>
