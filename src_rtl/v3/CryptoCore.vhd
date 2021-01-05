@@ -97,7 +97,7 @@ architecture behavioral of CryptoCore is
     signal n_tag_verified, tag_verified :std_logic;
 
     signal adcreg_en: std_logic;
-    signal adcreg_sel: std_logic_vector(2 downto 0);
+    signal adcreg_sel: std_logic_vector(1 downto 0);
     signal adcreg_valid, n_adcreg_valid :std_logic;
     signal ad_valid_bytes, ad_pad_loc :   std_logic_vector (CCWdiv8 -1 downto 0);
 
@@ -111,6 +111,7 @@ architecture behavioral of CryptoCore is
     signal bdi_padd_value: std_logic_vector(7 downto 0);
     signal n_ct_done_state, ct_done_state: std_logic;
     signal bdi_bdo_equal: std_logic;
+    signal sel_prev: std_logic;
     
 begin
     bdi_padd <= reverse_byte(padd(bdi, ad_valid_bytes, ad_pad_loc, bdi_padd_value));
@@ -293,6 +294,7 @@ end process;
             
             adcreg_en => adcreg_en,
             adcreg_sel => adcreg_sel,
+            sel_prev => sel_prev,
             
             bdo => bdo_s,
 
@@ -314,7 +316,7 @@ begin
     ms_en <= '0';
     ms_sel <= '0';
     adcreg_en <= '0';
-    adcreg_sel <= "000";
+    adcreg_sel <= "00";
 
     load_lfsr <= '0';
 
@@ -329,6 +331,7 @@ begin
     n_decrypt_op <= decrypt_op;
     n_perm_cnt_int <= 0;
     piso_load <= '0';
+    sel_prev <= '1';
     
 
     case ctl_s is
@@ -350,11 +353,11 @@ begin
             n_ctl_s <= PERM_KEY;
             n_sipo_s <= NPUB;
             adcreg_en <= '1';
-            adcreg_sel <= "001";
+            adcreg_sel <= "01";
         end if;
     when PERM_KEY =>
         adcreg_en <= '1';
-        adcreg_sel <= "000";
+        adcreg_sel <= "00";
         n_perm_cnt_int <= perm_cnt_int + 1;
         if perm_cnt_int = PERM_CYCLES-1 then
             --Save the perm key
@@ -384,26 +387,26 @@ begin
     when AD_FULL =>
         if sipo_cnt >= BLOCK_SIZE-1 or done_state = '1' then
             adcreg_en <= '1';
-            adcreg_sel <= "001";
+            adcreg_sel <= "01";
             sipo_rst_cnt <= '1';
             n_adcreg_valid <= done_state;
             n_ctl_s <= AD_PRE_PERM;
         end if;
     when AD_PRE_PERM =>
         adcreg_en <= '1';
-        adcreg_sel <= "011";
+        adcreg_sel <= "11";
         --reset perm
         load_lfsr <= '1';
         n_ctl_s <= AD_PERM;
     when AD_PERM =>
-        adcreg_sel <= "000";
+        adcreg_sel <= "00";
         n_perm_cnt_int <= perm_cnt_int + 1;
         adcreg_en <= '1';
         if perm_cnt_int = PERM_CYCLES-1 then
             n_ctl_s <= AD_POST_PERM;
         end if;
     when AD_POST_PERM =>
-        adcreg_sel <= "011";
+        adcreg_sel <= "11";
         adcreg_en <= '1';
         tag_sel <= "01";
         datap_lfsr_en <= '1';
@@ -432,7 +435,7 @@ begin
     when CT_FULL =>
         if sipo_cnt >= BLOCK_SIZE or done_state = '1' then
             adcreg_en <= '1';
-            adcreg_sel <= "001";
+            adcreg_sel <= "01";
             n_adcreg_valid <= '1';
             n_ctl_s <= M_PRE_PERM;
         end if;
@@ -441,13 +444,14 @@ begin
         ms_en <= '1';
         ms_sel <= '0';
         adcreg_en <= '1';
-        adcreg_sel <= "100";
+        adcreg_sel <= "11";
+        sel_prev <= '0';
         --reset perm
         load_lfsr <= '1';
         n_ctl_s <= M_PERM;
     when M_PERM =>
         ms_sel <= '1';
-        adcreg_sel <= "000";
+        adcreg_sel <= "00";
         if perm_cnt_int = PERM_CYCLES-1 then
             if piso_cnt = 0 then
                 adcreg_en <= '1';
@@ -461,7 +465,7 @@ begin
             n_perm_cnt_int <= perm_cnt_int + 1;            
         end if;
     when M_POST_PERM =>
-        adcreg_sel <= "010";
+        adcreg_sel <= "10";
         adcreg_en <= '1';
         n_adcreg_valid <= '1';
         piso_load <= '1';

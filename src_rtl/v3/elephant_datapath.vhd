@@ -45,7 +45,8 @@ entity elephant_datapath is
         datap_lfsr_en: in std_logic;
 
         adcreg_en : in std_logic;
-        adcreg_sel: in std_logic_vector(2 downto 0);
+        adcreg_sel: in std_logic_vector(1 downto 0);
+        sel_prev: in std_logic;
         
         bdo: out std_logic_vector(CCW_SIZE-1 downto 0);
 
@@ -63,7 +64,7 @@ architecture behavioral of elephant_datapath is
     signal lfsr_current: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_next: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_prev: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal lfsr_next_or_current:std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_next_or_current, lfsr_prev_or_current:std_logic_vector(STATE_SIZE-1 downto 0);
     
     signal key_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal npub_out: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
@@ -77,7 +78,7 @@ architecture behavioral of elephant_datapath is
     signal mreg, ms_reg_input_mux, ms_mask_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal ms_mask_out0, ms_mask_out1, ms_mask_out2, ms_mask_out3, ms_mask_out4: std_logic_vector(CCW-1 downto 0);
 
-    signal adcreg, mask_temp, ad_mask, ct_mask: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal adcreg, mask_temp, ad_mask: std_logic_vector(STATE_SIZE-1 downto 0);
 
     signal lfsr_input: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_output: std_logic_vector(STATE_SIZE+16-1 downto 0);
@@ -88,10 +89,10 @@ begin
     --Idea is to stop sipo on last byte
     --Load into here then padd next cycle in here while loading into sipo normally
     lfsr_next_or_current <= lfsr_next when ms_next_current = '0' else lfsr_current;
+    lfsr_prev_or_current <= lfsr_prev when sel_prev = '1' else lfsr_current;
     
     mask_temp <= adcreg xor lfsr_next;
-    ad_mask <= mask_temp xor lfsr_prev;
-    ct_mask <= mask_temp xor lfsr_current;
+    ad_mask <= mask_temp xor lfsr_prev_or_current;
 
     ms_mask_out <= mreg xor sipo xor lfsr_next_or_current;
     ms_mask_out0 <= ms_mask_out(CCW-1 downto 0);
@@ -104,15 +105,11 @@ begin
     begin
         if rising_edge(clk) then
             if adcreg_en = '1' then
-                if adcreg_sel = "000" then
+                if adcreg_sel = "00" then
                     adcreg <= permout2;
-                elsif adcreg_sel = "001" then
+                elsif adcreg_sel = "01" then
                     adcreg <= sipo;
-                elsif adcreg_sel = "011" then
-                    adcreg <= ad_mask;
-                elsif adcreg_sel = "100" then
-                    adcreg <= ct_mask;
-                elsif adcreg_sel = "010" then
+                elsif adcreg_sel = "10" then
                     if sipo_cnt <= 1 then
                         adcreg(CCW-1 downto 0) <= reverse_byte(padd(reverse_byte(ms_mask_out0),
                                                 sipo_valid_bytes,
@@ -176,11 +173,11 @@ begin
                     else
                         adcreg(CCW*5-1 downto CCW*4) <= ms_mask_out4;
                     end if;
-                --elsif adcreg_sel = "111" then
-                --    adcreg(sipo_cnt) <=  padd(adcreg(CCW*(sipo_cnt+1)-1 downto CCW*sipo_cnt), sipo_valid_bytes, sipo_pad_loc, x"01");                    
+                else
+                    adcreg <= ad_mask;
                 end if;
-            --adcreg <= adcreg_blocks(4) & adcreg_blocks(3) & adcreg_blocks(2) & adcreg_blocks(1) & adcreg_blocks(0);
             end if;
+
             if key_en = '1' then
                 key_out <= permout2;
             end if;
