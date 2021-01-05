@@ -82,13 +82,15 @@ architecture behavioral of CryptoCore is
 --    signal reset_perm_cnt: std_logic;
     signal perm_cnt_int, n_perm_cnt_int: integer range 0 to PERM_CYCLES;
     
-    type ctl_state is (IDLE, STORE_KEY, PERM_KEY, LOAD_KEY,
+    type ctl_state is (IDLE, STORE_KEY, PERM, LOAD_KEY,
                        LOAD_LFSR_AD,
-                       AD_FULL, AD_PRE_PERM, AD_PERM, AD_POST_PERM,
-                       M_PRE_PERM, M_PERM, M_POST_PERM,
+                       AD_FULL, AD_PRE_PERM, AD_POST_PERM,
+                       M_PRE_PERM, M_POST_PERM,
                        CT_DELAY, CT_FULL,
                        TAG_S, TAG_WAIT);
     signal n_ctl_s, ctl_s: ctl_state;
+    type calling_perm_state is (KEY_PRE, AD_PRE, M_PRE);
+    signal n_calling_state, calling_state: calling_perm_state;
     type sipo_state is (IDLE, SIPO_KEY, NPUB, AD, PT, CT, TAG);
     signal n_sipo_s, sipo_s: sipo_state;
     signal done_state, n_done_state: std_logic;
@@ -336,6 +338,7 @@ begin
     piso_load <= '0';
     sel_prev <= '1';
     bdo_tag <= '0';
+    n_calling_state <= calling_state;
     
 
     case ctl_s is
@@ -353,24 +356,34 @@ begin
         end if;
     when STORE_KEY =>
         if sipo_cnt = KEY_SIZE then
-            n_ctl_s <= PERM_KEY;
+            n_ctl_s <= PERM;
+            n_calling_state <= KEY_PRE;
             n_sipo_s <= NPUB;
             adcreg_en <= '1';
             adcreg_sel <= "01";
         end if;
-    when PERM_KEY =>
+    when PERM =>
         adcreg_en <= '1';
         adcreg_sel <= "00";
+        ms_sel <= '1';
+        ms_en <= '1';
         if perm_cnt_int = PERM_CYCLES-1 then
             --Save the perm key
-             key_en <= '1';
-             n_ctl_s <= LOAD_LFSR_AD;
+             if calling_state = KEY_PRE then
+                 key_en <= '1';
+                 n_ctl_s <= LOAD_LFSR_AD;
+             elsif calling_state = AD_PRE then
+                 n_ctl_s <= AD_POST_PERM;
+             else
+                n_ctl_s <= M_POST_PERM;
+             end if;
         else
             n_perm_cnt_int <= perm_cnt_int + 1;
         end if;
-        if sipo_cnt = ELE_NPUB_SIZE then 
+        if sipo_cnt = ELE_NPUB_SIZE and calling_state = KEY_PRE then 
             n_sipo_s <= AD;
         end if;
+
     when LOAD_LFSR_AD =>
         n_decrypt_op <= decrypt_in;
         if perm_cnt_int = 0 then
@@ -398,14 +411,8 @@ begin
         adcreg_sel <= "11";
         --reset perm
         load_lfsr <= '1';
-        n_ctl_s <= AD_PERM;
-    when AD_PERM =>
-        adcreg_sel <= "00";
-        n_perm_cnt_int <= perm_cnt_int + 1;
-        adcreg_en <= '1';
-        if perm_cnt_int = PERM_CYCLES-1 then
-            n_ctl_s <= AD_POST_PERM;
-        end if;
+        n_ctl_s <= PERM;
+        n_calling_state <= AD_PRE;
     when AD_POST_PERM =>
         adcreg_sel <= "11";
         adcreg_en <= '1';
@@ -449,22 +456,8 @@ begin
         sel_prev <= '0';
         --reset perm
         load_lfsr <= '1';
-        n_ctl_s <= M_PERM;
-    when M_PERM =>
-        ms_sel <= '1';
-        adcreg_sel <= "00";
-        if perm_cnt_int = PERM_CYCLES-1 then
-            if piso_cnt = 0 then
-                adcreg_en <= '1';
-                ms_en <= '1';
-                n_perm_cnt_int <= perm_cnt_int + 1;
-                n_ctl_s <= M_POST_PERM;
-            end if;            
-        else
-            adcreg_en <= '1';
-            ms_en <= '1';
-            n_perm_cnt_int <= perm_cnt_int + 1;            
-        end if;
+        n_ctl_s <= PERM;
+        n_calling_state <= M_PRE;
     when M_POST_PERM =>
         adcreg_sel <= "10";
         adcreg_en <= '1';
@@ -600,21 +593,22 @@ begin
         perm_cnt_int <= n_perm_cnt_int;
         sipo_cnt <= n_sipo_cnt;
         piso_cnt <= n_piso_cnt;
+        calling_state <= n_calling_state;
+        sipo_valid_bytes <= n_sipo_valid_bytes;
+        piso_valid_bytes <= n_piso_valid_bytes;
+        sipo_pad_loc <= n_sipo_pad_loc;
+        done_state <= n_done_state;
+        decrypt_op <= n_decrypt_op;
+        tag_verified <= n_tag_verified;
+        append_one <= n_append_one;
+        adcreg_valid <= n_adcreg_valid;
+        ct_done_state <= n_ct_done_state;
         if rst = '1' then
             ctl_s <= IDLE;
             sipo_s <= IDLE;
         else
             ctl_s <= n_ctl_s;
             sipo_s <= n_sipo_s;
-            sipo_valid_bytes <= n_sipo_valid_bytes;
-            piso_valid_bytes <= n_piso_valid_bytes;
-            sipo_pad_loc <= n_sipo_pad_loc;
-            done_state <= n_done_state;
-            decrypt_op <= n_decrypt_op;
-            tag_verified <= n_tag_verified;
-            append_one <= n_append_one;
-            adcreg_valid <= n_adcreg_valid;
-            ct_done_state <= n_ct_done_state;
         end if;
     end if;
 end process;
