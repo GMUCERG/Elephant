@@ -1,0 +1,15 @@
+elephant_constants.vhd
+design_pkg.vhd
+elephant_perm.vhd
+elephant_datapath.vhd
+LWC/NIST_LWAPI_pkg.vhd
+LWC/key_piso.vhd
+LWC/fwft_fifo.vhd
+LWC/data_sipo.vhd
+LWC/data_piso.vhd
+LWC/StepDownCountLd.vhd
+LWC/PreProcessor.vhd
+LWC/PostProcessor.vhd
+CryptoCore.vhd
+LWC/LWC.vhd
+
