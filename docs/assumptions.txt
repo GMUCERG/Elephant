@@ -13,7 +13,8 @@ Development Package
     data_piso.vhd       | Y     | v1.0.2           |  N                       
     data_sipo.vhd       | Y     | v1.0.2           |  N                       
     key_piso.vhd        | Y     | v1.0.2           |  N                       
-    PreProcessor.vhd    | Y     | v1.0.2           |  N                       
+    PreProcessor.vhd    | Y     | v1.0.2           |  Y 
+                                                     (In the directories for v3 and v4)
     PostProcessor.vhd   | Y     | v1.0.2           |  N                       
     fwft_fifo.vhd       | Y     | v1.0.2           |  N                       
     LWC.vhd             | Y     | v1.0.2           |  N                       
