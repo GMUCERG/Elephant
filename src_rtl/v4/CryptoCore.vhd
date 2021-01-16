@@ -236,7 +236,8 @@ begin
             sipo_rst <= '1';
             n_sipo_cnt_saved <= sipo_cnt;
             n_sipo_valid_bytes_saved <= sipo_valid_bytes;
-            if (bdi_valid = '0' or bdi_type = HDR_TAG) and append_one = '1' then
+            if ((bdi_valid = '0' or bdi_type = HDR_TAG or bdi_type = HDR_NPUB) and
+                append_one = '1') then
                 n_sipo_pad_loc <= "1000";
                 n_sipo_valid_bytes <= (others => '0');
             end if;
