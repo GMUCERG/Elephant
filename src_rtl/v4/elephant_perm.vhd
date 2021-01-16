@@ -117,6 +117,49 @@ architecture elephant_perm of elephant_perm is
         x"152a552b",
         x"572f5f3f",
         (others => '0'));
+    type lfsr_rom_2t is array (0 to 40) of std_logic_vector(15 downto 0);
+    constant lfsr_rom2: lfsr_rom_2t :=(
+        x"756a",
+        x"5429",
+        x"5327",
+        x"4f1f",
+        x"3e7d",
+        x"7a74",
+        x"6850",
+        x"2143",
+        x"070e",
+        x"1c38",
+        x"7162",
+        x"4409",
+        x"1224",
+        x"4913",
+        x"264d",
+        x"1b36",
+        x"6d5a",
+        x"356b",
+        x"562d",
+        x"5b37",
+        x"6f5e",
+        x"3d7b",
+        x"766c",
+        x"5831",
+        x"6346",
+        x"0d1a",
+        x"3469",
+        x"5225",
+        x"4b17",
+        x"2e5d",
+        x"3b77",
+        x"6e5c",
+        x"3973",
+        x"664c",
+        x"1932",
+        x"654a",
+        x"152a",
+        x"552b",
+        x"572f",
+        x"5f3f",
+        (others => '0'));
     signal lfsr_rom_sig: std_logic_vector((8*PERM_ROUNDS_PER_CYCLE)-1 downto 0);
     type lfsr_output_array_t is array(0 to PERM_ROUNDS_PER_CYCLE-1) of std_logic_vector(6 downto 0);
     signal lfsr_output_array, reverse_lfsr_output_array: lfsr_output_array_t;
@@ -150,6 +193,9 @@ begin
         end generate;
         lsfr_sig_4: if PERM_ROUNDS_PER_CYCLE = 4 generate
             lfsr_rom_sig <= lfsr_rom4(perm_count);
+        end generate;
+        lsfr_sig_2: if PERM_ROUNDS_PER_CYCLE = 2 generate
+            lfsr_rom_sig <= lfsr_rom2(perm_count);
         end generate;
     end generate;
 
