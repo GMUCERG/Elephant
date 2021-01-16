@@ -237,7 +237,7 @@ begin
             n_sipo_cnt_saved <= sipo_cnt;
             n_sipo_valid_bytes_saved <= sipo_valid_bytes;
             if (bdi_valid = '0' or bdi_type = HDR_TAG) and append_one = '1' then
-                n_sipo_pad_loc <= bdi_pad_loc;
+                n_sipo_pad_loc <= "1000";
                 n_sipo_valid_bytes <= (others => '0');
             end if;
         elsif (bdi_type = HDR_PT or bdi_type = HDR_CT) and sipo_cnt < BLOCK_SIZE then
