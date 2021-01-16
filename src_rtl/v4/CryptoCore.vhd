@@ -542,6 +542,9 @@ p_piso: process(all)
         n_piso_valid_bytes <= piso_valid_bytes;
         bdi_bdo_equal <= '1';
         msg_auth_valid <= '0';
+        msg_auth <= '0';
+        n_tag_verified <= tag_verified;
+        piso_sel <= '0';
         if piso_load = '1' then
             piso_en <= '1';
             n_piso_valid_bytes <= sipo_valid_bytes_saved;
