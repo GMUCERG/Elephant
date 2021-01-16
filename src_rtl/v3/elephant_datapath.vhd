@@ -23,36 +23,34 @@ use work.Design_pkg.all;
 entity elephant_datapath is
     port(
         --Signals to con
-        sipo: in std_logic_vector(STATE_SIZE-1 downto 0);
-        sipo_cnt : integer range 0 to BLOCK_SIZE+1;
-        sipo_valid_bytes : in   std_logic_vector (CCWdiv8 -1 downto 0);
-        sipo_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_or_key: in std_logic_vector(CCW_SIZE-1 downto 0);
+        padding_extra: in std_logic;
+        bdi_valid_bytes : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        bdi_pad_loc : in   std_logic_vector (CCWdiv8 -1 downto 0);
+        data_type_sel: std_logic;
 
-        piso_en: in std_logic;
-        piso_sel: in std_logic;
+        load_data_en: in std_logic;
+        load_data_sel: in std_logic;
+        lfsr_mux_sel: in std_logic_vector(1 downto 0);
         
         --Signals for key and npub
         key_en: in std_logic;
         npub_en: in std_logic;
-        tag_rst: in std_logic;
         tag_en: in std_logic;
+        tag_reset: in std_logic;
         
         ms_en: in std_logic;
-        ms_sel: in std_logic;
-        ms_next_current: in std_logic;
-
+        --Signals for permutation
+        ms_sel: in std_logic_vector(1 downto 0);
+        load_lfsr: in std_logic;
         
         datap_lfsr_load: in std_logic;
         datap_lfsr_en: in std_logic;
-
-        adcreg_en : in std_logic;
-        adcreg_sel: in std_logic_vector(1 downto 0);
-        sel_prev: in std_logic;
         
         bdo: out std_logic_vector(CCW_SIZE-1 downto 0);
-        bdo_tag: in std_logic;
-
-        load_lfsr: in std_logic;
+        bdo_sel: in std_logic_vector(1 downto 0);
+        saving_bdo: in std_logic;
+        data_count: in integer range 0 to BLOCK_SIZE+1; --std_logic_vector(2 downto 0);
         perm_count: in integer range 0 to PERM_CYCLES;
         clk: in std_logic
     );
@@ -60,132 +58,38 @@ end elephant_datapath;
 
 architecture behavioral of elephant_datapath is
     
-    signal permout1, permout2: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal permout: std_logic_vector(STATE_SIZE-1 downto 0);
     
     signal datap_lfsr_out: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_current: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_next: std_logic_vector(STATE_SIZE-1 downto 0);
     signal lfsr_prev: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal lfsr_next_or_current, lfsr_prev_or_current:std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal prev_next_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal cur_next_ms_xor: std_logic_vector(STATE_SIZE-1 downto 0);
+
+    
+    signal bdi_or_bdo: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal load_data_input_mux: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal load_data_output: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal lfsr_xor_mux: std_logic_vector(STATE_SIZE-1 downto 0);
     
     signal key_out: std_logic_vector(STATE_SIZE-1 downto 0);
     signal npub_out: std_logic_vector(NPUB_SIZE_BITS-1 downto 0);
-    signal tag_out : std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_out: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
+    signal tag_input: std_logic_vector(TAG_SIZE_BITS-1 downto 0);
     
-
-    signal piso, piso_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
-
+    -- Verifiy this size
+    signal ms_reg_input_mux: std_logic_vector(STATE_SIZE-1 downto 0);
+    signal ms_reg_out: std_logic_vector(STATE_SIZE-1 downto 0);
     
-    signal mreg, ms_reg_input_mux, ms_mask_out: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal ms_mask_out0, ms_mask_out1, ms_mask_out2, ms_mask_out3, ms_mask_out4: std_logic_vector(CCW-1 downto 0);
-
-    signal adcreg, mask_temp, ad_mask: std_logic_vector(STATE_SIZE-1 downto 0);
-
+    signal data_bdo, data_bdo1: std_logic_vector(CCW_SIZE-1 downto 0);
+    signal data_out: std_logic_vector(CCW_SIZE-1 downto 0);
+    
     signal lfsr_input: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_output: std_logic_vector(STATE_SIZE+16-1 downto 0);
     signal lfsr_temp_rot: std_logic_vector(7 downto 0);
-    
-    
 begin
-    --Idea is to stop sipo on last byte
-    --Load into here then padd next cycle in here while loading into sipo normally
-    lfsr_next_or_current <= lfsr_next when ms_next_current = '0' else lfsr_current;
-    lfsr_prev_or_current <= lfsr_prev when sel_prev = '1' else lfsr_current;
-    
-    mask_temp <= adcreg xor lfsr_next;
-    ad_mask <= mask_temp xor lfsr_prev_or_current;
-
-    ms_mask_out <= mreg xor sipo xor lfsr_next_or_current;
-    ms_mask_out0 <= ms_mask_out(CCW-1 downto 0);
-    ms_mask_out1 <= ms_mask_out(CCW*2-1 downto CCW);
-    ms_mask_out2 <= ms_mask_out(CCW*3-1 downto CCW*2);
-    ms_mask_out3 <= ms_mask_out(CCW*4-1 downto CCW*3);
-    ms_mask_out4 <= ms_mask_out(CCW*5-1 downto CCW*4);
-                             
-    p_adcreg: process(all)
-    begin
-        if rising_edge(clk) then
-            if adcreg_en = '1' then
-                if adcreg_sel = "00" then
-                    adcreg <= permout2;
-                elsif adcreg_sel = "01" then
-                    adcreg <= sipo;
-                elsif adcreg_sel = "10" then
-                    if sipo_cnt <= 1 then
-                        adcreg(CCW-1 downto 0) <= reverse_byte(padd(reverse_byte(ms_mask_out0),
-                                                sipo_valid_bytes,
-                                                sipo_pad_loc, x"01"));
-                    else --All of the bytes valid
-                        adcreg(CCW-1 downto 0) <= ms_mask_out0;
-                    end if;
-
-                    if sipo_cnt < 2 then
-                        if sipo_valid_bytes = "1111" and sipo_cnt = 1 then
-                            adcreg(CCW*2-1 downto CCW*1) <= x"00000001";
-                        else
-                            adcreg(CCW*2-1 downto CCW*1) <= (others => '0');
-                        end if;
-                    elsif sipo_cnt = 2 then
-                        adcreg(CCW*2-1 downto CCW*1) <= reverse_byte(padd(reverse_byte(ms_mask_out1),
-                                                                     sipo_valid_bytes,
-                                                                     sipo_pad_loc, x"01"));
-                    else
-                         adcreg(CCW*2-1 downto CCW*1) <= ms_mask_out1;
-                    end if;
-
-                    if sipo_cnt < 3 then
-                        if sipo_valid_bytes = "1111" and sipo_cnt = 2 then
-                            adcreg(CCW*3-1 downto CCW*2) <= x"00000001";
-                        else
-                            adcreg(CCW*3-1 downto CCW*2) <= (others => '0');
-                        end if;
-                    elsif sipo_cnt = 3 then
-                        adcreg(CCW*3-1 downto CCW*2) <= reverse_byte(padd(reverse_byte(ms_mask_out2),
-                                                                     sipo_valid_bytes,
-                                                                     sipo_pad_loc, x"01"));
-                    else
-                        adcreg(CCW*3-1 downto CCW*2) <= ms_mask_out2;
-                    end if;
-                    
-                    if sipo_cnt < 4 then
-                        if sipo_valid_bytes = "1111" and sipo_cnt = 3 then
-                            adcreg(CCW*4-1 downto CCW*3) <= x"00000001";
-                        else
-                            adcreg(CCW*4-1 downto CCW*3) <= (others => '0');
-                        end if;
-                    elsif sipo_cnt = 4 then
-                        adcreg(CCW*4-1 downto CCW*3) <= reverse_byte(padd(reverse_byte(ms_mask_out3),
-                                                                     sipo_valid_bytes,
-                                                                     sipo_pad_loc, x"01"));
-                    else
-                        adcreg(CCW*4-1 downto CCW*3) <= ms_mask_out3;
-                    end if;
-                    
-                    if sipo_cnt < 5 then
-                        if sipo_valid_bytes = "1111" and sipo_cnt = 4 then
-                            adcreg(CCW*5-1 downto CCW*4) <= x"00000001";
-                        else
-                            adcreg(CCW*5-1 downto CCW*4) <= (others => '0');
-                        end if;
-                    elsif sipo_cnt = 5 then
-                        adcreg(CCW*5-1 downto CCW*4) <= reverse_byte(padd(reverse_byte(ms_mask_out4),
-                                                                     sipo_valid_bytes,
-                                                                     sipo_pad_loc, x"01"));
-                    else
-                        adcreg(CCW*5-1 downto CCW*4) <= ms_mask_out4;
-                    end if;
-                else
-                    adcreg <= ad_mask;
-                end if;
-            end if;
-
-            if key_en = '1' then
-                key_out <= permout2;
-            end if;
-        end if;
-    end process;
-
-
     --LFSR output
     --C code
     --BYTE temp = rotl3(input[0]) ^ (input[3] << 7) ^ (input[13] >> 7);
@@ -193,13 +97,6 @@ begin
                      (lfsr_output(5+16) xor lfsr_output(111+16));
     lfsr_input <= lfsr_temp_rot & lfsr_output(STATE_SIZE+16-1 downto 8) when datap_lfsr_load = '0' else  key_out & x"0000";
     datap_lfsr_out <= lfsr_output;
-
-    --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
-    --Would likely required this to happen after mux and => ms_reg would be zero prior
-    --to the loading the state.
-    lfsr_current <= datap_lfsr_out(STATE_SIZE+8-1 downto 8);
-    lfsr_next <= datap_lfsr_out(STATE_SIZE+16-1 downto 16);
-    lfsr_prev <= datap_lfsr_out(STATE_SIZE-1 downto 0);
 
     p_lfsr_data: process(clk, datap_lfsr_en)
     begin
@@ -210,63 +107,86 @@ begin
 
     PERM: entity work.elephant_perm
         port map(
-            input => mreg,
+            input => ms_reg_out,
             clk => clk,
             perm_count => perm_count,
             load_lfsr => load_lfsr,
-            output => permout1
+            output => permout
         );
-    PERM2: entity work.elephant_perm
-        port map(
-            input => adcreg,
-            clk => clk,
-            perm_count => perm_count,
-            load_lfsr => load_lfsr,
-            output => permout2
-        );
-
-    ms_reg_input_mux <= permout1 when ms_sel = '1' else 
-                                        lfsr_next_or_current(STATE_SIZE-1 downto NPUB_SIZE_BITS) & 
-                                        (npub_out xor lfsr_next_or_current(NPUB_SIZE_BITS-1 downto 0));
-
     p_ms_reg: process(clk, ms_en)
     begin
         if rising_edge(clk) and  ms_en = '1' then
-            mreg <= ms_reg_input_mux;
+            ms_reg_out <= ms_reg_input_mux;
         end if;
     end process;
-
+    p_key_reg: process(clk, key_en)
+    begin
+        if rising_edge(clk) and key_en = '1' then
+            key_out <= ms_reg_input_mux(STATE_SIZE-1 downto 0);
+        end if;
+    end process;
 
     p_npub_reg: process(clk, npub_en)
     begin
         if rising_edge(clk) and npub_en = '1' then
-            npub_out <= sipo(NPUB_SIZE_BITS-1 downto 0);
+            npub_out <= load_data_output(STATE_SIZE-1 downto STATE_SIZE-NPUB_SIZE_BITS);
         end if;
     end process;
 
-    p_tag_reg: process(clk)
+    p_tag_reg: process(clk, tag_en)
     begin
-        if rising_edge(clk) then
-            if tag_rst = '1' then
-                tag_out <= x"00000000" & tag_out(CCW*2-1 downto CCW);
-            else
-                if tag_en = '1' then
-                    tag_out <= tag_out xor mask_temp(TAG_SIZE_BITS-1 downto 0) xor lfsr_prev_or_current(TAG_SIZE_BITS-1 downto 0);
-                end if;
-            end if;
+        if rising_edge(clk) and tag_en = '1' then
+            tag_out <= tag_input;
         end if;
     end process;
-    
-    
-    piso_input_mux <= ms_mask_out when piso_sel = '1' else x"00000000" & piso(STATE_SIZE-1 downto CCW);
-    p_piso: process(all)
+
+    p_load_data: process(clk, load_data_en)
     begin
-        if rising_edge(clk) and piso_en = '1' then
-                piso <= piso_input_mux;
+        if rising_edge(clk) and load_data_en = '1' then
+                load_data_output <= load_data_input_mux & load_data_output(STATE_SIZE-1 downto CCW_SIZE);
         end if;
     end process;
-    
-    bdo <= piso(CCW-1 downto 0) when bdo_tag = '0' else tag_out(CCW-1 downto 0);
+
+    --Select between process key or bdi
+    bdi_or_bdo <= bdi_or_key when saving_bdo = '0' else data_bdo;
+
+    --Also mux is very large at the momment might be able to reduce to CCW size
+    --mux to reset load_data and shift data input
+    with load_data_sel select
+        load_data_input_mux <= x"0000000" &"000" & padding_extra  when '0',
+                               bdi_or_bdo   when others;
+
+    --Above and beyond logic see if there is a way to not include ms_reg_out in xor.
+    --Would likely required this to happen after mux and => ms_reg would be zero prior
+    --to the loading the state.
+    lfsr_current <= datap_lfsr_out(STATE_SIZE+8-1 downto 8);
+    lfsr_next <= datap_lfsr_out(STATE_SIZE+16-1 downto 16);
+    lfsr_prev <= datap_lfsr_out(STATE_SIZE-1 downto 0);
+    cur_ms_xor <= lfsr_current xor ms_reg_out;
+    prev_next_ms_xor <= lfsr_prev xor lfsr_next xor ms_reg_out;
+    cur_next_ms_xor <= lfsr_next xor cur_ms_xor;
+    with lfsr_mux_sel select
+        lfsr_xor_mux <= load_data_output when "00",
+                        cur_ms_xor when "01",     
+                        prev_next_ms_xor when "10",
+                        cur_next_ms_xor when others;
+    --Update Tag
+    tag_input <= lfsr_xor_mux(TAG_SIZE_BITS-1 downto 0) xor tag_out when tag_reset = '0' else (others => '0');
+
+    --Logic for ms_reg_mux and perm
+    with ms_sel select
+        ms_reg_input_mux <= x"00000000" & ms_reg_out(STATE_SIZE-1 downto CCW) when "00",
+                            lfsr_xor_mux when "01",
+                            x"0000000000000000" & npub_out when "10",
+                            permout when others; 
+    data_bdo1 <= bdi_or_key xor ms_reg_out(CCW-1 downto 0);
+
+    data_bdo <= --padd(reverse_byte(data_bdo1),bdi_valid_bytes,bdi_pad_loc);
+        reverse_byte(padd(reverse_byte(data_bdo1),bdi_valid_bytes,bdi_pad_loc));
+    with bdo_sel select
+        bdo <= data_bdo1 when "00",
+               tag_out(31 downto 0) when "01",
+               tag_out(TAG_SIZE_BITS-1 downto 32) when others;
     
 end behavioral;
 

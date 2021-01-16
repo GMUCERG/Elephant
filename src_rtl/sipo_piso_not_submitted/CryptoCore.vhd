@@ -76,7 +76,7 @@ architecture behavioral of CryptoCore is
     signal datap_lfsr_en: std_logic;
     
     --Signals for data counter
-    signal n_sipo_cnt, sipo_cnt, n_sipo_cnt_saved, sipo_cnt_saved :integer range 0 to BLOCK_SIZE+1;
+    signal n_sipo_cnt, sipo_cnt :integer range 0 to BLOCK_SIZE+1;
     signal n_piso_cnt, piso_cnt :integer range 0 to BLOCK_SIZE+1;
     
 --    signal reset_perm_cnt: std_logic;
@@ -104,9 +104,8 @@ architecture behavioral of CryptoCore is
     signal ad_valid_bytes, ad_pad_loc :   std_logic_vector (CCWdiv8 -1 downto 0);
 
     signal sipo: std_logic_vector(STATE_SIZE-1 downto 0);
-    signal sipo_en, sipo_rst, sipo_rst_cnt, sipo_save_en: std_logic;
+    signal sipo_en, sipo_rst, sipo_rst_cnt: std_logic;
     signal sipo_valid_bytes, n_sipo_valid_bytes,sipo_pad_loc, n_sipo_pad_loc :   std_logic_vector (CCWdiv8 -1 downto 0);
-    signal sipo_valid_bytes_saved, n_sipo_valid_bytes_saved :   std_logic_vector (CCWdiv8 -1 downto 0);
     signal piso_en, piso_load: std_logic;
     signal piso_sel: std_logic;
     signal piso_valid_bytes, n_piso_valid_bytes :   std_logic_vector (CCWdiv8 -1 downto 0);
@@ -151,9 +150,7 @@ begin
     n_done_state <= done_state;
     n_append_one <= append_one;
     n_sipo_valid_bytes <= sipo_valid_bytes;
-    n_sipo_valid_bytes_saved <= sipo_valid_bytes_saved;
     n_sipo_pad_loc <= sipo_pad_loc;
-    n_sipo_cnt_saved <= sipo_cnt_saved;
     ad_valid_bytes <= bdi_valid_bytes;
     ad_pad_loc <= bdi_pad_loc;
     bdi_padd_value <= x"01";
@@ -164,7 +161,6 @@ begin
         n_append_one <= '0';
         n_done_state <= '0';
         n_sipo_valid_bytes <= (others => '0');
-        n_sipo_valid_bytes_saved <= (others => '0');
         n_sipo_pad_loc <= (others => '0');
     when SIPO_KEY =>
         bdi_or_key <= reverse_byte(key);
@@ -234,10 +230,8 @@ begin
         if sipo_rst_cnt = '1' then 
             n_sipo_cnt <= 0;
             sipo_rst <= '1';
-            n_sipo_cnt_saved <= sipo_cnt;
-            n_sipo_valid_bytes_saved <= sipo_valid_bytes;
             if (bdi_valid = '0' or bdi_type = HDR_TAG) and append_one = '1' then
-                n_sipo_pad_loc <= "1000";
+                n_sipo_pad_loc <= bdi_pad_loc;
                 n_sipo_valid_bytes <= (others => '0');
             end if;
         elsif (bdi_type = HDR_PT or bdi_type = HDR_CT) and sipo_cnt < BLOCK_SIZE then
@@ -282,8 +276,8 @@ end process;
     ELEPHANT_DATAP: entity work.elephant_datapath
         port map(
             sipo => sipo,
-            sipo_cnt => sipo_cnt_saved,
-            sipo_valid_bytes => sipo_valid_bytes_saved,
+            sipo_cnt => sipo_cnt,
+            sipo_valid_bytes => sipo_valid_bytes,
             sipo_pad_loc => sipo_pad_loc,
 
             piso_en => piso_en,
@@ -294,7 +288,6 @@ end process;
             npub_en => npub_en,
             tag_rst => tag_rst,
             tag_en => tag_en,
-            sipo_save_en => sipo_save_en,
 
             ms_en => ms_en,
             ms_sel => ms_sel,
@@ -345,7 +338,6 @@ begin
     piso_load <= '0';
     sel_prev <= '1';
     bdo_tag <= '0';
-    sipo_save_en <= '0';
     n_calling_state <= calling_state;
     
 
@@ -383,10 +375,6 @@ begin
              elsif calling_state = AD_PRE then
                  n_ctl_s <= AD_POST_PERM;
              else
-                if decrypt_op = '0' then
-                    sipo_save_en <= '1';
-                    sipo_rst_cnt <= '1';
-                end if;
                 n_ctl_s <= M_POST_PERM;
              end if;
         else
@@ -470,13 +458,6 @@ begin
         load_lfsr <= '1';
         n_ctl_s <= PERM;
         n_calling_state <= M_PRE;
-        if decrypt_op /= '0' then
-            sipo_save_en <= '1';
-            sipo_rst_cnt <= '1';
-        end if;
-        if decrypt_op /= '0' and done_state = '1' and decrypt_op = '1' then
-            n_ct_done_state <= '1';
-        end if;
     when M_POST_PERM =>
         adcreg_sel <= "10";
         adcreg_en <= '1';
@@ -485,13 +466,18 @@ begin
         piso_load <= '1';
         datap_lfsr_en <= '1';
         if ct_done_state = '0' then
+            sipo_rst_cnt <= '1';
             if decrypt_op = '0' then
                 n_ctl_s <= M_PRE_PERM;
                 if done_state = '1' then
                     n_ct_done_state <= '1';
                 end if;
             else
-                n_ctl_s <= CT_FULL;
+                if done_state = '1' then
+                    n_ctl_s <= TAG_S;
+                else
+                    n_ctl_s <= CT_FULL;
+                end if;
             end if;
         else
             n_ctl_s <= TAG_S;
@@ -543,13 +529,13 @@ p_piso: process(all)
         msg_auth_valid <= '0';
         if piso_load = '1' then
             piso_en <= '1';
-            n_piso_valid_bytes <= sipo_valid_bytes_saved;
+            n_piso_valid_bytes <= sipo_valid_bytes;
             n_tag_verified <= '1';
             if ctl_s = TAG_S then
                 n_piso_cnt <= 2;
             else
                 piso_sel <= '1';
-                n_piso_cnt <= sipo_cnt_saved;
+                n_piso_cnt <= sipo_cnt;
             end if;
         elsif piso_cnt > 0 then
             piso_sel <= '0';
@@ -606,11 +592,9 @@ begin
     if rising_edge(clk) then
         perm_cnt_int <= n_perm_cnt_int;
         sipo_cnt <= n_sipo_cnt;
-        sipo_cnt_saved <= n_sipo_cnt_saved;
         piso_cnt <= n_piso_cnt;
         calling_state <= n_calling_state;
         sipo_valid_bytes <= n_sipo_valid_bytes;
-        sipo_valid_bytes_saved <= n_sipo_valid_bytes_saved;
         piso_valid_bytes <= n_piso_valid_bytes;
         sipo_pad_loc <= n_sipo_pad_loc;
         done_state <= n_done_state;

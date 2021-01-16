@@ -315,7 +315,7 @@ FSM_32BIT: if (G_W=32) generate
     --! next state function
     process (pr_state, sdi_valid, last_flit_of_segment, decrypt_internal,
             pdi_valid, key_ready_p, bdi_ready_p, eot_flag, pdi_seg_length,
-            pdi_opcode, sdi_opcode, cmd_ready)
+            pdi_opcode, sdi_opcode, cmd_ready, bdi_ready)
 
     begin
 
@@ -385,7 +385,11 @@ FSM_32BIT: if (G_W=32) generate
                 if (pdi_valid = '1') then
                     received_wrong_header <= pdi_opcode /= HDR_AD;
                     if (pdi_seg_length = x"0000" and eot_flag = '1') then
-                        nx_state <= S_HDR_MSG;
+                        if bdi_ready = '1' then
+                            nx_state <= S_HDR_MSG;
+                        else
+                            nx_state <= S_HDR_AD;
+                        end if;
                     else
                         nx_state <= S_LD_AD;
                     end if;
@@ -409,10 +413,14 @@ FSM_32BIT: if (G_W=32) generate
                 if (pdi_valid = '1' and cmd_ready = '1') then
                     received_wrong_header <= (pdi_opcode /= HDR_PT and pdi_opcode /= HDR_CT);
                     if (pdi_seg_length = x"0000" and eot_flag = '1') then
-                        if (decrypt_internal = '1') then
-                            nx_state <= S_HDR_TAG;
+                        if bdi_ready = '1' then
+                            if (decrypt_internal = '1') then
+                                nx_state <= S_HDR_TAG;
+                            else
+                                nx_state <= S_INT_MODE;
+                            end if;
                         else
-                            nx_state <= S_INT_MODE;
+                            nx_state <= S_HDR_MSG;
                         end if;
                     else
                         nx_state <= S_LD_MSG;
@@ -579,7 +587,11 @@ FSM_32BIT: if (G_W=32) generate
 
             -- AD
             when S_HDR_AD =>
-                pdi_ready       <='1';
+                if pdi_seg_length = x"0000" and eot_flag = '1' and bdi_ready_p = '0' then
+                    pdi_ready <= '0';
+                else
+                    pdi_ready       <='1';
+                end if;
                 len_SegLenCnt   <= pdi_valid;
                 if (pdi_valid = '1') then
                     nx_eoi_flag <= pdi_data(26);
@@ -594,8 +606,12 @@ FSM_32BIT: if (G_W=32) generate
 
             -- Plaintext or Ciphertext
             when S_HDR_MSG =>
-                cmd_valid       <= pdi_valid;
-                pdi_ready       <= cmd_ready;
+                if pdi_seg_length = x"0000" and eot_flag = '1' and bdi_ready_p = '0' then
+                    pdi_ready <= '0';
+                else
+                    pdi_ready       <= cmd_ready;
+                    cmd_valid       <= pdi_valid;
+                end if;
                 len_SegLenCnt   <= pdi_valid and cmd_ready;
                 if (pdi_valid = '1' and cmd_ready = '1') then
                     nx_eoi_flag <= pdi_data(26);
