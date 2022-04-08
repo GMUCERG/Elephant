@@ -13,10 +13,9 @@
 --!             under the License Exception TSU (Technology and software-
 --!             unrestricted)
 --------------------------------------------------------------------------------
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
+library ieee;
+use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use ieee.math_real.all;
 use work.elephant_constants.all;
 
 entity elephant_perm is
@@ -170,7 +169,7 @@ begin
             input_array(x) <= (reverse_lfsr_output_array(x) xor player_array(x-1)(STATE_SIZE - 1 downto 153)) & player_array(x-1)(152 downto 7) & (lfsr_output_array(x) xor player_array(x-1)(6 downto 0));
         end generate;
         sbox_gen: for i in 39 downto 0 generate
-            state_sbox_array(x)(i*4 + 3 downto i*4) <= sbox(to_integer(unsigned(input_array(x)(i*4 + 3 downto i*4))));
+            state_sbox_array(x)(i*4 + 3 downto i*4) <= sbox(to_integer(to_01(unsigned(input_array(x)(i*4 + 3 downto i*4)))));
         end generate;
         playerg: for j in 0 to 158 generate
             player_array(x)((40 * j) mod (STATE_SIZE-1)) <= state_sbox_array(x)(j);

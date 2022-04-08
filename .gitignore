@@ -1,9 +1,8 @@
-timing*
 log.txt
 result.txt
-Makefile
 *.gtkw
-KAT/*
 *.ghw
+*.vcd
+*.o
 *.cf
-config.ini
+xeda_run/

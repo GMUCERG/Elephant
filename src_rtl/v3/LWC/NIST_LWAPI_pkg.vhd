@@ -59,8 +59,8 @@ package NIST_LWAPI_pkg is
     constant HDR_NPUB_AD    : std_logic_vector(4    -1 downto 0):="0010";
     constant HDR_AD_NPUB    : std_logic_vector(4    -1 downto 0):="0011";
     constant HDR_PT         : std_logic_vector(4    -1 downto 0):="0100";
-        --deprecated! use HDR_PT instead!
-       alias HDR_MSG is                                           HDR_PT;
+    --deprecated! use HDR_PT instead!
+    alias HDR_MSG is                                           HDR_PT;
     constant HDR_CT         : std_logic_vector(4    -1 downto 0):="0101";
     constant HDR_CT_TAG     : std_logic_vector(4    -1 downto 0):="0110";
     constant HDR_HASH_MSG   : std_logic_vector(4    -1 downto 0):="0111";
